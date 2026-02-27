@@ -63,7 +63,7 @@ Required providers (v1):
 - What it is: self-hosted speech-to-text backend (fast + private, no vendor lock-in).
 - Why include: best for users who want local control over audio/transcripts.
 - Reference:
-  - **Use Rolands' WhisperX fork (not upstream).**
+  - **Use Rolands' WhisperX repo (not upstream):** https://github.com/logingrupa/whisperX-FastAPI
   - Workspace skill/runbook reference: `/home/forge/.openclaw/workspace/skills/whisperx/SKILL.md`
 - In this gateway, expected config:
   - `STT_PROVIDER=whisperx`
