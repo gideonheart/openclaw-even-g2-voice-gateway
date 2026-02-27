@@ -58,9 +58,44 @@ Define type-safe provider interface:
 - `transcribe(input: AudioPayload, ctx: SttContext): Promise<SttResult>`
 
 Required providers (v1):
-- WhisperX (self-hosted)
-- OpenAI STT
-- Generic Custom HTTP STT
+
+1) **WhisperX (self-hosted) — default provider**
+- What it is: self-hosted speech-to-text backend (fast + private, no vendor lock-in).
+- Why include: best for users who want local control over audio/transcripts.
+- Reference:
+  - WhisperX project: https://github.com/m-bain/whisperX
+- In this gateway, expected config:
+  - `STT_PROVIDER=whisperx`
+  - `WHISPERX_BASE_URL=https://your-whisperx-host`
+- Request sample (conceptual):
+  - `POST /speech-to-text` with multipart audio file
+  - poll task endpoint until completed
+
+2) **OpenAI STT (API key)**
+- What it is: managed cloud transcription provider.
+- Why include: simple onboarding and good reliability for users who do not self-host STT.
+- Reference:
+  - OpenAI platform docs: https://platform.openai.com/docs/guides/speech-to-text
+- In this gateway, expected config:
+  - `STT_PROVIDER=openai`
+  - `OPENAI_API_KEY=...`
+
+3) **Generic Custom HTTP STT**
+- What it is: adapter interface for any external STT service with HTTP API.
+- Why include: extensibility (Deepgram, AssemblyAI, enterprise internal STT, etc.) without code rewrite.
+- In this gateway, expected config:
+  - `STT_PROVIDER=custom`
+  - `CUSTOM_STT_URL=https://your-stt-endpoint`
+  - `CUSTOM_STT_AUTH=Bearer ...` (or provider-specific secret)
+- Contract sample:
+  - Request: audio blob + metadata (`sampleRate`, `languageHint`)
+  - Response (normalized):
+    ```json
+    { "text": "transcribed text", "language": "en", "confidence": 0.92 }
+    ```
+
+Provider implementation note:
+- All providers must map into a shared `SttResult` type so downstream OpenClaw messaging logic stays provider-agnostic.
 
 ### FR-3: OpenClaw Session Messaging
 - Send transcript to configured OpenClaw target session
