@@ -103,10 +103,80 @@ Provider implementation note:
 - Receive assistant response
 - Support configurable response shaping for glasses (truncation/pagination)
 
-### FR-4: Glasses Output
-- Render response to glasses text container(s)
-- Preserve readable formatting
-- Handle long replies safely
+### FR-4: Glasses Output (icon-first, chat-oriented)
+
+#### FR-4.1 Visual style direction
+- Prefer **icon + minimal text** UX (not dense text HUD).
+- Use animated BMP/PNG icon frames for state feedback (Claude Code-like throbber feel).
+- Keep text area focused on chat bubbles:
+  - right bubble = user STT transcript
+  - left bubble = OpenClaw response
+
+#### FR-4.2 Gesture model (4 inputs only)
+- `tap`:
+  - idle -> start recording
+  - recording -> stop recording
+- `double tap`:
+  - context action (cancel current turn OR open quick menu)
+- `scroll up/down`:
+  - move within chat viewport/history
+  - navigate menu items when menu is open
+
+#### FR-4.3 State icons and animation
+Required state set:
+- `IDLE` (neutral icon)
+- `RECORDING` (blinking mic icon)
+- `SENT` (audio finished/sent icon)
+- `THINKING` (animated throbber while waiting OpenClaw)
+- `STREAMING` (response-in-progress icon)
+- `DONE/ERROR` states
+
+Animation policy:
+- low FPS (3-6 fps) to keep BLE payloads stable
+- no high-frequency waveform rendering on glasses
+- optional **simulated waveform glyph/icon animation** allowed during recording
+
+#### FR-4.4 Rendering constraints (from existing G2 sample implementations)
+- Display canvas target: `576x288`
+- image container practical bounds per half panel: up to `200x100`
+- text upgrade max observed in samples: `contentLength <= 2000` per upgrade call
+
+Implementation implication:
+- do incremental updates (container upgrades / image frame swaps)
+- avoid full rebuild for every token/frame
+- throttle visual updates (~150-300ms cadence)
+- follow bitmap discipline proven in `samples/EvenChess` (small silhouette/bitmap assets, diff-aware updates)
+#### FR-4.5 Menu, hide/wake UI, and session switching
+Must support:
+- a lightweight menu panel (invoked via configured gesture, default double tap from idle)
+- menu items:
+  - Resume chat UI
+  - Hide UI (minimal status-only mode)
+  - Wake UI (return to chat mode)
+  - Switch target OpenClaw session
+  - Settings
+
+When UI hidden:
+- keep audio/turn pipeline alive
+- render only compact status icon/line
+
+#### FR-4.6 Long-response handling (no hard cut-offs)
+Use a **virtualized message window** strategy:
+- maintain full conversation history in local state
+- render only visible window chunk to glasses viewport
+- stream new tokens/chunks to bottom of current assistant bubble
+- evict non-visible top lines from rendered viewport (not from canonical history)
+- on scroll up/down, re-materialize the requested slice
+
+Required pagination metadata:
+- current window index / total windows
+- per-message continuation markers when split across windows
+
+#### FR-4.7 Readability rules
+- preserve paragraph breaks where possible
+- normalize whitespace and line wraps for narrow display
+- keep system/status lines visually separate from chat bubbles
+- prevent status animations from shifting bubble layout
 
 ### FR-5: Settings + Configuration
 Configurable from frontend settings menu:
