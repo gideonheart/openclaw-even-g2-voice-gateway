@@ -44,11 +44,11 @@ Plans:
   2. GET /readyz returns healthy only when both the configured STT provider and OpenClaw gateway are reachable, and the gateway refuses traffic until startup pre-checks pass
   3. Malformed HTTP payloads, oversized audio, and requests from non-allowlisted origins are rejected with clear error responses before reaching any business logic
   4. Rate limiting prevents abuse of the voice endpoint, and request body size limits prevent memory exhaustion from oversized audio payloads
-**Plans**: TBD
+**Plans**: 2 plans
 
 Plans:
-- [ ] 02-01: TBD
-- [ ] 02-02: TBD
+- [ ] 02-01-PLAN.md — ConfigStore class, settings validation, error codes (TDD)
+- [ ] 02-02-PLAN.md — Wire ConfigStore into server, POST/GET settings, CORS hardening, startup gate
 
 ### Phase 3: Provider Extensibility
 **Goal**: The STT layer is genuinely pluggable -- adding the OpenAI and Custom HTTP adapters requires zero changes to the gateway orchestrator or SttProvider interface, and providers are switchable at runtime via settings
