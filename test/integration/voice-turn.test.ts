@@ -154,6 +154,7 @@ describe("Voice Turn Integration", () => {
     expect(reply.timing.agentMs).toBeGreaterThanOrEqual(0);
     expect(reply.timing.totalMs).toBeGreaterThanOrEqual(0);
     expect(reply.meta.provider).toBe("whisperx");
+    expect(reply.meta.model).toBe("medium");
 
     // Verify STT was called with audio
     expect(mockProvider.transcribe).toHaveBeenCalledOnce();
