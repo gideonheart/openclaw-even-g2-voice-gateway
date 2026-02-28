@@ -44,11 +44,11 @@ Ship production-ready backend gateway for Even G2 voice -> OpenClaw responses.
 - [x] Add truncation safeguards with continuation markers
 
 ## 7) Docs + release
-- [ ] Write `docs/architecture.md`
-- [ ] Write `docs/security.md`
-- [ ] Write `docs/runbook.md`
-- [ ] Add `.env.example` (no secrets)
-- [ ] Update README quickstart (no Docker)
+- [x] Write `docs/architecture.md`
+- [x] Write `docs/security.md`
+- [x] Write `docs/runbook.md`
+- [x] Add `.env.example` (no secrets)
+- [x] Update README quickstart (no Docker)
 
 ## 8) Push checkpoints
 - [x] Commit foundation scaffold (3dde320)
