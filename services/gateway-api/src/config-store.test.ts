@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
-import { ConfigStore } from "./config-store.js";
+import { ConfigStore, validateSettingsPatch } from "./config-store.js";
 import type { GatewayConfig, SafeGatewayConfig } from "@voice-gateway/shared-types";
-import { createProviderId, createSessionKey } from "@voice-gateway/shared-types";
+import { createProviderId, createSessionKey, UserError, ErrorCodes } from "@voice-gateway/shared-types";
 
 /** Minimal valid GatewayConfig fixture for tests. */
 function makeTestConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
@@ -136,5 +136,128 @@ describe("ConfigStore", () => {
       expect(updated.customHttp.url).toBe("https://new-stt.local");
       expect(updated.customHttp.authHeader).toBe("Bearer custom-token");
     });
+  });
+});
+
+describe("validateSettingsPatch", () => {
+  it("returns empty patch for empty input", () => {
+    const result = validateSettingsPatch({});
+    expect(result).toEqual({});
+  });
+
+  it("validates a valid openclawGatewayUrl", () => {
+    const result = validateSettingsPatch({ openclawGatewayUrl: "ws://localhost:3000" });
+    expect(result.openclawGatewayUrl).toBe("ws://localhost:3000");
+  });
+
+  it("throws UserError for invalid openclawGatewayUrl", () => {
+    expect(() => validateSettingsPatch({ openclawGatewayUrl: "not-a-url" })).toThrow(UserError);
+    try {
+      validateSettingsPatch({ openclawGatewayUrl: "not-a-url" });
+    } catch (err) {
+      expect((err as UserError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("validates a valid sttProvider and returns branded ProviderId", () => {
+    const result = validateSettingsPatch({ sttProvider: "whisperx" });
+    expect(result.sttProvider).toBe("whisperx");
+  });
+
+  it("throws UserError for invalid sttProvider", () => {
+    expect(() => validateSettingsPatch({ sttProvider: "invalid-provider" })).toThrow(UserError);
+    try {
+      validateSettingsPatch({ sttProvider: "invalid-provider" });
+    } catch (err) {
+      expect((err as UserError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("validates a valid openclawSessionKey and returns branded SessionKey", () => {
+    const result = validateSettingsPatch({ openclawSessionKey: "my-session" });
+    expect(result.openclawSessionKey).toBe("my-session");
+  });
+
+  it("throws UserError for empty openclawSessionKey", () => {
+    expect(() => validateSettingsPatch({ openclawSessionKey: "" })).toThrow(UserError);
+    try {
+      validateSettingsPatch({ openclawSessionKey: "" });
+    } catch (err) {
+      expect((err as UserError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("validates a valid openclawGatewayToken (non-empty)", () => {
+    const result = validateSettingsPatch({ openclawGatewayToken: "secret-token" });
+    expect(result.openclawGatewayToken).toBe("secret-token");
+  });
+
+  it("validates nested whisperx.baseUrl", () => {
+    const result = validateSettingsPatch({ whisperx: { baseUrl: "http://new-url" } });
+    expect(result.whisperx?.baseUrl).toBe("http://new-url");
+  });
+
+  it("throws on non-positive whisperx.pollIntervalMs", () => {
+    expect(() =>
+      validateSettingsPatch({ whisperx: { pollIntervalMs: -1 } }),
+    ).toThrow(UserError);
+  });
+
+  it("throws UserError for non-object input (string)", () => {
+    expect(() => validateSettingsPatch("not an object" as unknown)).toThrow(UserError);
+    try {
+      validateSettingsPatch("not an object" as unknown);
+    } catch (err) {
+      expect((err as UserError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("throws UserError for null input", () => {
+    expect(() => validateSettingsPatch(null as unknown)).toThrow(UserError);
+    try {
+      validateSettingsPatch(null as unknown);
+    } catch (err) {
+      expect((err as UserError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("silently ignores unknown fields", () => {
+    const result = validateSettingsPatch({ unknownField: "value", anotherRandom: 42 } as unknown);
+    expect(result).toEqual({});
+    expect((result as Record<string, unknown>)["unknownField"]).toBeUndefined();
+  });
+
+  it("validates multiple fields at once", () => {
+    const result = validateSettingsPatch({
+      openclawGatewayUrl: "ws://localhost:5000",
+      sttProvider: "openai",
+      openai: { apiKey: "sk-new-key", model: "whisper-2" },
+    });
+    expect(result.openclawGatewayUrl).toBe("ws://localhost:5000");
+    expect(result.sttProvider).toBe("openai");
+    expect(result.openai?.apiKey).toBe("sk-new-key");
+    expect(result.openai?.model).toBe("whisper-2");
+  });
+
+  it("validates whisperx.timeoutMs as positive integer", () => {
+    const result = validateSettingsPatch({ whisperx: { timeoutMs: 5000 } });
+    expect(result.whisperx?.timeoutMs).toBe(5000);
+  });
+
+  it("throws on non-positive whisperx.timeoutMs", () => {
+    expect(() =>
+      validateSettingsPatch({ whisperx: { timeoutMs: 0 } }),
+    ).toThrow(UserError);
+  });
+
+  it("validates customHttp fields", () => {
+    const result = validateSettingsPatch({
+      customHttp: {
+        url: "https://stt.example.com/v2",
+        authHeader: "Bearer new-token",
+      },
+    });
+    expect(result.customHttp?.url).toBe("https://stt.example.com/v2");
+    expect(result.customHttp?.authHeader).toBe("Bearer new-token");
   });
 });

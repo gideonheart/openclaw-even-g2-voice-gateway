@@ -18,6 +18,17 @@ import type {
   CustomHttpConfig,
   ServerConfig,
 } from "@voice-gateway/shared-types";
+import {
+  createProviderId,
+  createSessionKey,
+  UserError,
+  ErrorCodes,
+} from "@voice-gateway/shared-types";
+import {
+  validateUrl,
+  requireNonEmpty,
+  validatePositiveInt,
+} from "@voice-gateway/validation";
 
 /**
  * A validated partial update for GatewayConfig.
@@ -113,4 +124,144 @@ export class ConfigStore {
       }),
     };
   }
+}
+
+// ── Validation ──
+
+/**
+ * Validates a raw settings patch from an external source (e.g., POST /api/settings).
+ *
+ * Only present fields are validated. Unknown top-level fields are silently ignored.
+ * Catches TypeError from branded constructors and rethrows as UserError
+ * so the HTTP layer returns 400, not 500.
+ *
+ * @param body - Raw input from request body (unknown type)
+ * @returns A validated partial settings patch safe for ConfigStore.update()
+ * @throws UserError with INVALID_CONFIG code for any validation failure
+ */
+export function validateSettingsPatch(body: unknown): ValidatedSettingsPatch {
+  if (body == null || typeof body !== "object" || Array.isArray(body)) {
+    throw new UserError(
+      ErrorCodes.INVALID_CONFIG,
+      "Settings patch must be a non-null object.",
+    );
+  }
+
+  const raw = body as Record<string, unknown>;
+  const patch: Record<string, unknown> = {};
+
+  // ── Top-level scalars ──
+
+  if ("openclawGatewayUrl" in raw && raw["openclawGatewayUrl"] !== undefined) {
+    patch.openclawGatewayUrl = validateUrl(
+      String(raw["openclawGatewayUrl"]),
+      "openclawGatewayUrl",
+    );
+  }
+
+  if ("openclawGatewayToken" in raw && raw["openclawGatewayToken"] !== undefined) {
+    patch.openclawGatewayToken = requireNonEmpty(
+      String(raw["openclawGatewayToken"]),
+      "openclawGatewayToken",
+    );
+  }
+
+  if ("openclawSessionKey" in raw && raw["openclawSessionKey"] !== undefined) {
+    try {
+      patch.openclawSessionKey = createSessionKey(String(raw["openclawSessionKey"]));
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new UserError(ErrorCodes.INVALID_CONFIG, err.message);
+      }
+      throw err;
+    }
+  }
+
+  if ("sttProvider" in raw && raw["sttProvider"] !== undefined) {
+    try {
+      patch.sttProvider = createProviderId(String(raw["sttProvider"]));
+    } catch (err) {
+      if (err instanceof TypeError) {
+        throw new UserError(ErrorCodes.INVALID_CONFIG, err.message);
+      }
+      throw err;
+    }
+  }
+
+  // ── Nested: whisperx ──
+
+  if ("whisperx" in raw && raw["whisperx"] !== undefined) {
+    if (typeof raw["whisperx"] !== "object" || raw["whisperx"] == null) {
+      throw new UserError(ErrorCodes.INVALID_CONFIG, "whisperx must be an object.");
+    }
+    const wxRaw = raw["whisperx"] as Record<string, unknown>;
+    const wx: Record<string, unknown> = {};
+
+    if ("baseUrl" in wxRaw && wxRaw["baseUrl"] !== undefined) {
+      wx.baseUrl = validateUrl(String(wxRaw["baseUrl"]), "whisperx.baseUrl");
+    }
+    if ("model" in wxRaw && wxRaw["model"] !== undefined) {
+      wx.model = requireNonEmpty(String(wxRaw["model"]), "whisperx.model");
+    }
+    if ("language" in wxRaw && wxRaw["language"] !== undefined) {
+      wx.language = requireNonEmpty(String(wxRaw["language"]), "whisperx.language");
+    }
+    if ("pollIntervalMs" in wxRaw && wxRaw["pollIntervalMs"] !== undefined) {
+      wx.pollIntervalMs = validatePositiveInt(wxRaw["pollIntervalMs"], "whisperx.pollIntervalMs");
+    }
+    if ("timeoutMs" in wxRaw && wxRaw["timeoutMs"] !== undefined) {
+      wx.timeoutMs = validatePositiveInt(wxRaw["timeoutMs"], "whisperx.timeoutMs");
+    }
+
+    if (Object.keys(wx).length > 0) {
+      patch.whisperx = wx;
+    }
+  }
+
+  // ── Nested: openai ──
+
+  if ("openai" in raw && raw["openai"] !== undefined) {
+    if (typeof raw["openai"] !== "object" || raw["openai"] == null) {
+      throw new UserError(ErrorCodes.INVALID_CONFIG, "openai must be an object.");
+    }
+    const oaiRaw = raw["openai"] as Record<string, unknown>;
+    const oai: Record<string, unknown> = {};
+
+    if ("apiKey" in oaiRaw && oaiRaw["apiKey"] !== undefined) {
+      oai.apiKey = requireNonEmpty(String(oaiRaw["apiKey"]), "openai.apiKey");
+    }
+    if ("model" in oaiRaw && oaiRaw["model"] !== undefined) {
+      oai.model = requireNonEmpty(String(oaiRaw["model"]), "openai.model");
+    }
+    if ("language" in oaiRaw && oaiRaw["language"] !== undefined) {
+      oai.language = requireNonEmpty(String(oaiRaw["language"]), "openai.language");
+    }
+
+    if (Object.keys(oai).length > 0) {
+      patch.openai = oai;
+    }
+  }
+
+  // ── Nested: customHttp ──
+
+  if ("customHttp" in raw && raw["customHttp"] !== undefined) {
+    if (typeof raw["customHttp"] !== "object" || raw["customHttp"] == null) {
+      throw new UserError(ErrorCodes.INVALID_CONFIG, "customHttp must be an object.");
+    }
+    const chRaw = raw["customHttp"] as Record<string, unknown>;
+    const ch: Record<string, unknown> = {};
+
+    if ("url" in chRaw && chRaw["url"] !== undefined) {
+      ch.url = validateUrl(String(chRaw["url"]), "customHttp.url");
+    }
+    if ("authHeader" in chRaw && chRaw["authHeader"] !== undefined) {
+      ch.authHeader = requireNonEmpty(String(chRaw["authHeader"]), "customHttp.authHeader");
+    }
+
+    if (Object.keys(ch).length > 0) {
+      patch.customHttp = ch;
+    }
+  }
+
+  return patch as ValidatedSettingsPatch;
 }
