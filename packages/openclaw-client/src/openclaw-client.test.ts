@@ -327,6 +327,148 @@ describe("OpenClawClient", () => {
       client.disconnect();
     });
 
+    it("includes challenge nonce in connect frame params", async () => {
+      let receivedNonce: unknown;
+      server.on("connection", (ws) => {
+        ws.send(JSON.stringify({
+          type: "event",
+          event: "connect.challenge",
+          payload: { nonce: "challenge-nonce-abc123" },
+        }));
+        ws.on("message", (data) => {
+          const frame = JSON.parse(data.toString());
+          if (frame.method === "connect") {
+            receivedNonce = frame.params?.nonce;
+            ws.send(JSON.stringify({
+              type: "res",
+              id: frame.id,
+              ok: true,
+              payload: {
+                type: "hello-ok",
+                protocol: 3,
+                server: { version: "test", connId: "c1" },
+                features: { methods: [], events: [] },
+                snapshot: { presence: [], stateVersion: { presence: 0, health: 0 } },
+                policy: { maxPayload: 1024, maxBufferedBytes: 4096, tickIntervalMs: 30000 },
+              },
+            }));
+          }
+        });
+      });
+
+      const client = new OpenClawClient(
+        {
+          gatewayUrl: `ws://127.0.0.1:${port}`,
+          authToken: "test-token",
+          connectTimeoutMs: 5000,
+          retry: { maxRetries: 0, baseDelayMs: 10, maxDelayMs: 100 },
+        },
+        logger,
+      );
+
+      await client.connect();
+      expect(receivedNonce).toBe("challenge-nonce-abc123");
+      client.disconnect();
+    });
+
+    it("omits nonce when no connect.challenge is received", async () => {
+      let receivedParams: Record<string, unknown> | undefined;
+      server.on("connection", (ws) => {
+        // No connect.challenge sent -- client falls back after timer
+        ws.on("message", (data) => {
+          const frame = JSON.parse(data.toString());
+          if (frame.method === "connect") {
+            receivedParams = frame.params;
+            ws.send(JSON.stringify({
+              type: "res",
+              id: frame.id,
+              ok: true,
+              payload: {
+                type: "hello-ok",
+                protocol: 3,
+                server: { version: "test", connId: "c1" },
+                features: { methods: [], events: [] },
+                snapshot: { presence: [], stateVersion: { presence: 0, health: 0 } },
+                policy: { maxPayload: 1024, maxBufferedBytes: 4096, tickIntervalMs: 30000 },
+              },
+            }));
+          }
+        });
+      });
+
+      const client = new OpenClawClient(
+        {
+          gatewayUrl: `ws://127.0.0.1:${port}`,
+          authToken: "test-token",
+          connectTimeoutMs: 5000,
+          retry: { maxRetries: 0, baseDelayMs: 10, maxDelayMs: 100 },
+        },
+        logger,
+      );
+
+      await client.connect();
+      expect(receivedParams).toBeDefined();
+      // nonce should be undefined (not present) when no challenge was received
+      expect(receivedParams!["nonce"]).toBeUndefined();
+      client.disconnect();
+    });
+
+    it("is rejected by server when nonce is missing but required (regression)", async () => {
+      // Server that requires nonce in connect params and rejects without it
+      server.on("connection", (ws) => {
+        const expectedNonce = "required-nonce-xyz";
+        ws.send(JSON.stringify({
+          type: "event",
+          event: "connect.challenge",
+          payload: { nonce: expectedNonce },
+        }));
+        ws.on("message", (data) => {
+          const frame = JSON.parse(data.toString());
+          if (frame.method === "connect") {
+            const nonce = frame.params?.nonce;
+            if (nonce !== expectedNonce) {
+              ws.send(JSON.stringify({
+                type: "res",
+                id: frame.id,
+                ok: false,
+                error: { code: "INVALID_REQUEST", message: "invalid challenge response" },
+              }));
+              ws.close(1008, "invalid challenge response");
+              return;
+            }
+            ws.send(JSON.stringify({
+              type: "res",
+              id: frame.id,
+              ok: true,
+              payload: {
+                type: "hello-ok",
+                protocol: 3,
+                server: { version: "test", connId: "c1" },
+                features: { methods: [], events: [] },
+                snapshot: { presence: [], stateVersion: { presence: 0, health: 0 } },
+                policy: { maxPayload: 1024, maxBufferedBytes: 4096, tickIntervalMs: 30000 },
+              },
+            }));
+          }
+        });
+      });
+
+      const client = new OpenClawClient(
+        {
+          gatewayUrl: `ws://127.0.0.1:${port}`,
+          authToken: "test-token",
+          connectTimeoutMs: 5000,
+          retry: { maxRetries: 0, baseDelayMs: 10, maxDelayMs: 100 },
+        },
+        logger,
+      );
+
+      // With the fix, this should succeed because nonce is now included
+      await client.connect();
+      expect(client.isConnected()).toBe(true);
+      client.disconnect();
+    });
+
     it("sends proper request frame format (type:req, id, method, params)", async () => {
       let receivedFrame: Record<string, unknown> | undefined;
       server.on("connection", (ws) => {
