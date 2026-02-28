@@ -31,6 +31,7 @@ import type { OpenClawClient } from "@voice-gateway/openclaw-client";
 import { validateAudioContentType, validateAudioSize } from "@voice-gateway/validation";
 import { executeVoiceTurn } from "./orchestrator.js";
 import type { Logger } from "@voice-gateway/logging";
+import { ConfigStore, validateSettingsPatch } from "./config-store.js";
 
 // ── Rate Limiter ──
 
@@ -55,24 +56,34 @@ class RateLimiter {
 }
 
 export interface ServerDeps {
-  readonly config: GatewayConfig;
+  readonly configStore: ConfigStore;
   readonly sttProviders: Map<string, SttProvider>;
   readonly openclawClient: OpenClawClient;
   readonly logger: Logger;
+  ready: boolean;
 }
 
 /** Create and return the HTTP server (not yet listening). */
 export function createGatewayServer(deps: ServerDeps): Server {
   const log = deps.logger.child({ component: "http-server" });
-  const rateLimiter = new RateLimiter(deps.config.server.rateLimitPerMinute);
+  const rateLimiter = new RateLimiter(deps.configStore.get().server.rateLimitPerMinute);
 
   const server = createServer(async (req, res) => {
     const turnId = createTurnId();
     const requestLog = log.child({ turnId, method: req.method, url: req.url });
 
     try {
-      // CORS handling
-      if (handleCors(req, res, deps.config.server.corsOrigins)) return;
+      // Readiness gate — always allow /healthz (liveness probe)
+      if (!deps.ready && req.url !== "/healthz") {
+        sendJson(res, 503, {
+          error: "Gateway is starting up",
+          code: ErrorCodes.NOT_READY,
+        });
+        return;
+      }
+
+      // CORS handling (SAFE-07: strict rejection for non-allowlisted origins)
+      if (handleCors(req, res, deps.configStore.get().server.corsOrigins)) return;
 
       const url = req.url ?? "";
       const method = req.method ?? "GET";
@@ -82,14 +93,20 @@ export function createGatewayServer(deps: ServerDeps): Server {
         // Rate limit the expensive voice turn endpoint
         const clientIp = req.socket.remoteAddress ?? "unknown";
         if (!rateLimiter.check(clientIp)) {
-          sendJson(res, 429, { error: "Too many requests. Please wait.", code: "RATE_LIMITED" });
+          sendJson(res, 429, { error: "Too many requests. Please wait.", code: ErrorCodes.RATE_LIMITED });
           return;
         }
         await handleVoiceTurn(req, res, deps, turnId, requestLog);
       } else if (method === "POST" && url === "/api/settings") {
-        await handlePostSettings(req, res, requestLog);
+        // SAFE-06: Rate-limit the settings endpoint
+        const clientIp = req.socket.remoteAddress ?? "unknown";
+        if (!rateLimiter.check(clientIp)) {
+          sendJson(res, 429, { error: "Too many requests. Please wait.", code: ErrorCodes.RATE_LIMITED });
+          return;
+        }
+        await handlePostSettings(req, res, deps, requestLog);
       } else if (method === "GET" && url === "/api/settings") {
-        handleGetSettings(res, deps.config);
+        handleGetSettings(res, deps.configStore);
       } else if (method === "GET" && url === "/healthz") {
         handleHealthz(res);
       } else if (method === "GET" && url === "/readyz") {
@@ -114,14 +131,16 @@ async function handleVoiceTurn(
   turnId: ReturnType<typeof createTurnId>,
   log: Logger,
 ): Promise<void> {
+  const config = deps.configStore.get();
+
   // Read body
-  const body = await readBody(req, deps.config.server.maxAudioBytes);
+  const body = await readBody(req, config.server.maxAudioBytes);
 
   // Validate content type
   const contentType = validateAudioContentType(req.headers["content-type"]);
 
   // Validate size
-  validateAudioSize(body.length, deps.config.server.maxAudioBytes);
+  validateAudioSize(body.length, config.server.maxAudioBytes);
 
   const audio: AudioPayload = {
     data: body,
@@ -137,12 +156,12 @@ async function handleVoiceTurn(
   const result = await executeVoiceTurn(
     {
       turnId,
-      sessionKey: deps.config.openclawSessionKey,
+      sessionKey: config.openclawSessionKey,
       audio,
     },
     {
       sttProviders: deps.sttProviders,
-      activeProviderId: deps.config.sttProvider,
+      activeProviderId: config.sttProvider,
       openclawClient: deps.openclawClient,
       logger: deps.logger,
     },
@@ -151,42 +170,45 @@ async function handleVoiceTurn(
   sendJson(res, 200, result.reply);
 }
 
+/**
+ * POST /api/settings — validate and apply runtime config patch.
+ * SAFE-06: 64KB body size limit (settings are small JSON).
+ * CONF-05: Returns safe config with secrets masked.
+ */
 async function handlePostSettings(
-  _req: IncomingMessage,
+  req: IncomingMessage,
   res: ServerResponse,
+  deps: ServerDeps,
   log: Logger,
 ): Promise<void> {
-  // Phase 2 — settings management
-  log.info("Settings update requested (not implemented in Phase 1)");
-  sendJson(res, 501, {
-    error: "Settings API will be implemented in Phase 2",
-  });
+  // SAFE-06: Body size limit for settings (64KB max — settings are small JSON)
+  const body = await readBody(req, 64 * 1024);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString("utf-8"));
+  } catch {
+    throw new UserError(ErrorCodes.INVALID_CONFIG, "Request body is not valid JSON");
+  }
+
+  const patch = validateSettingsPatch(parsed);
+  deps.configStore.update(patch);
+
+  log.info("Settings updated successfully");
+
+  // CONF-05: Return safe config, never raw
+  sendJson(res, 200, deps.configStore.getSafe());
 }
 
+/**
+ * GET /api/settings — return safe config with secrets masked.
+ * Uses ConfigStore.getSafe() directly (no duplicated masking logic).
+ */
 function handleGetSettings(
   res: ServerResponse,
-  config: GatewayConfig,
+  configStore: ConfigStore,
 ): void {
-  const safe: SafeGatewayConfig = {
-    openclawGatewayUrl: config.openclawGatewayUrl,
-    openclawGatewayToken: "********",
-    openclawSessionKey: config.openclawSessionKey,
-    sttProvider: config.sttProvider,
-    whisperx: {
-      baseUrl: config.whisperx.baseUrl,
-      model: config.whisperx.model,
-    },
-    openai: {
-      apiKey: "********",
-      model: config.openai.model,
-    },
-    customHttp: {
-      url: config.customHttp.url,
-      authHeader: "********",
-    },
-    server: config.server,
-  };
-  sendJson(res, 200, safe);
+  sendJson(res, 200, configStore.getSafe());
 }
 
 function handleHealthz(res: ServerResponse): void {
@@ -197,7 +219,7 @@ async function handleReadyz(
   res: ServerResponse,
   deps: ServerDeps,
 ): Promise<void> {
-  const provider = deps.sttProviders.get(deps.config.sttProvider);
+  const provider = deps.sttProviders.get(deps.configStore.get().sttProvider);
   const [sttHealth, clawHealth] = await Promise.all([
     provider?.healthCheck() ??
       Promise.resolve({ healthy: false, message: "No provider", latencyMs: 0 }),
@@ -217,6 +239,18 @@ async function handleReadyz(
 
 // ── Helpers ──
 
+/**
+ * CORS handler with strict origin rejection (SAFE-07).
+ *
+ * - If corsOrigins is non-empty and the request Origin is NOT in the allowlist:
+ *   return 403 CORS_REJECTED (blocks the request entirely).
+ * - If corsOrigins is empty: allow all origins (development mode).
+ * - If origin matches allowlist: add CORS headers.
+ * - Preflight (OPTIONS): 204 with CORS headers if allowed, 204 without if not
+ *   (browser will block the actual request).
+ *
+ * Returns true if the response has been fully handled (caller should return).
+ */
 function handleCors(
   req: IncomingMessage,
   res: ServerResponse,
@@ -224,11 +258,34 @@ function handleCors(
 ): boolean {
   const origin = req.headers["origin"];
 
-  if (
-    origin &&
-    allowedOrigins.length > 0 &&
-    allowedOrigins.includes(origin)
-  ) {
+  if (allowedOrigins.length > 0) {
+    // Strict mode: only allowlisted origins pass
+    if (origin && allowedOrigins.includes(origin)) {
+      // Origin is in the allowlist — add CORS headers
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+      res.setHeader(
+        "Access-Control-Allow-Headers",
+        "Content-Type, Authorization, X-Language-Hint",
+      );
+      res.setHeader("Access-Control-Max-Age", "86400");
+    } else if (origin) {
+      // Origin present but NOT in allowlist — reject
+      if (req.method === "OPTIONS") {
+        // Preflight for non-matching origin: 204 without CORS headers (browser blocks)
+        res.writeHead(204);
+        res.end();
+        return true;
+      }
+      sendJson(res, 403, {
+        error: "Origin not allowed",
+        code: ErrorCodes.CORS_REJECTED,
+      });
+      return true;
+    }
+    // No origin header (e.g., server-to-server) — allow through without CORS headers
+  } else if (origin) {
+    // Development mode: allow all origins
     res.setHeader("Access-Control-Allow-Origin", origin);
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader(

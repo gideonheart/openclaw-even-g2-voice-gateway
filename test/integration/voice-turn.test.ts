@@ -9,6 +9,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import http from "node:http";
 import { WebSocketServer } from "ws";
 import { createGatewayServer } from "../../services/gateway-api/src/server.js";
+import { ConfigStore } from "../../services/gateway-api/src/config-store.js";
 import { OpenClawClient } from "@voice-gateway/openclaw-client";
 import { Logger } from "@voice-gateway/logging";
 import {
@@ -109,10 +110,11 @@ describe("Voice Turn Integration", () => {
     });
 
     httpServer = createGatewayServer({
-      config,
+      configStore: new ConfigStore(config),
       sttProviders: providers,
       openclawClient,
       logger,
+      ready: true,
     });
 
     // Start HTTP server
@@ -161,10 +163,11 @@ describe("Voice Turn Integration", () => {
   it("healthz returns 200", async () => {
     const config = makeConfig();
     httpServer = createGatewayServer({
-      config,
+      configStore: new ConfigStore(config),
       sttProviders: new Map(),
       openclawClient: new OpenClawClient({}, logger),
       logger,
+      ready: true,
     });
 
     await new Promise<void>((resolve) => {
@@ -183,10 +186,11 @@ describe("Voice Turn Integration", () => {
   it("rejects unsupported content type", async () => {
     const config = makeConfig();
     httpServer = createGatewayServer({
-      config,
+      configStore: new ConfigStore(config),
       sttProviders: new Map(),
       openclawClient: new OpenClawClient({}, logger),
       logger,
+      ready: true,
     });
 
     await new Promise<void>((resolve) => {
@@ -213,10 +217,11 @@ describe("Voice Turn Integration", () => {
   it("returns 404 for unknown routes", async () => {
     const config = makeConfig();
     httpServer = createGatewayServer({
-      config,
+      configStore: new ConfigStore(config),
       sttProviders: new Map(),
       openclawClient: new OpenClawClient({}, logger),
       logger,
+      ready: true,
     });
 
     await new Promise<void>((resolve) => {
@@ -239,10 +244,11 @@ describe("Voice Turn Integration", () => {
     });
 
     httpServer = createGatewayServer({
-      config,
+      configStore: new ConfigStore(config),
       sttProviders: new Map(),
       openclawClient: new OpenClawClient({}, logger),
       logger,
+      ready: true,
     });
 
     await new Promise<void>((resolve) => {
