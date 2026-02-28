@@ -327,54 +327,14 @@ describe("OpenClawClient", () => {
       client.disconnect();
     });
 
-    it("includes challenge nonce in connect frame params", async () => {
-      let receivedNonce: unknown;
+    it("does not include root-level nonce in connect frame params (schema compliance)", async () => {
+      let receivedParams: Record<string, unknown> | undefined;
       server.on("connection", (ws) => {
         ws.send(JSON.stringify({
           type: "event",
           event: "connect.challenge",
           payload: { nonce: "challenge-nonce-abc123" },
         }));
-        ws.on("message", (data) => {
-          const frame = JSON.parse(data.toString());
-          if (frame.method === "connect") {
-            receivedNonce = frame.params?.nonce;
-            ws.send(JSON.stringify({
-              type: "res",
-              id: frame.id,
-              ok: true,
-              payload: {
-                type: "hello-ok",
-                protocol: 3,
-                server: { version: "test", connId: "c1" },
-                features: { methods: [], events: [] },
-                snapshot: { presence: [], stateVersion: { presence: 0, health: 0 } },
-                policy: { maxPayload: 1024, maxBufferedBytes: 4096, tickIntervalMs: 30000 },
-              },
-            }));
-          }
-        });
-      });
-
-      const client = new OpenClawClient(
-        {
-          gatewayUrl: `ws://127.0.0.1:${port}`,
-          authToken: "test-token",
-          connectTimeoutMs: 5000,
-          retry: { maxRetries: 0, baseDelayMs: 10, maxDelayMs: 100 },
-        },
-        logger,
-      );
-
-      await client.connect();
-      expect(receivedNonce).toBe("challenge-nonce-abc123");
-      client.disconnect();
-    });
-
-    it("omits nonce when no connect.challenge is received", async () => {
-      let receivedParams: Record<string, unknown> | undefined;
-      server.on("connection", (ws) => {
-        // No connect.challenge sent -- client falls back after timer
         ws.on("message", (data) => {
           const frame = JSON.parse(data.toString());
           if (frame.method === "connect") {
@@ -408,32 +368,97 @@ describe("OpenClawClient", () => {
 
       await client.connect();
       expect(receivedParams).toBeDefined();
-      // nonce should be undefined (not present) when no challenge was received
+      // Root-level nonce is NOT part of OpenClaw ConnectParams schema (additionalProperties: false).
+      // Nonce belongs in device.nonce for device-paired connections only.
+      // Backend token-auth connections must NOT send root-level nonce.
       expect(receivedParams!["nonce"]).toBeUndefined();
+      expect(client.isConnected()).toBe(true);
       client.disconnect();
     });
 
-    it("is rejected by server when nonce is missing but required (regression)", async () => {
-      // Server that requires nonce in connect params and rejects without it
+    it("connect params match OpenClaw ConnectParamsSchema (no extra properties)", async () => {
+      let receivedParams: Record<string, unknown> | undefined;
       server.on("connection", (ws) => {
-        const expectedNonce = "required-nonce-xyz";
         ws.send(JSON.stringify({
           type: "event",
           event: "connect.challenge",
-          payload: { nonce: expectedNonce },
+          payload: { nonce: "nonce-schema-check" },
         }));
         ws.on("message", (data) => {
           const frame = JSON.parse(data.toString());
           if (frame.method === "connect") {
-            const nonce = frame.params?.nonce;
-            if (nonce !== expectedNonce) {
+            receivedParams = frame.params;
+            ws.send(JSON.stringify({
+              type: "res",
+              id: frame.id,
+              ok: true,
+              payload: {
+                type: "hello-ok",
+                protocol: 3,
+                server: { version: "test", connId: "c1" },
+                features: { methods: [], events: [] },
+                snapshot: { presence: [], stateVersion: { presence: 0, health: 0 } },
+                policy: { maxPayload: 1024, maxBufferedBytes: 4096, tickIntervalMs: 30000 },
+              },
+            }));
+          }
+        });
+      });
+
+      const client = new OpenClawClient(
+        {
+          gatewayUrl: `ws://127.0.0.1:${port}`,
+          authToken: "test-token",
+          connectTimeoutMs: 5000,
+          retry: { maxRetries: 0, baseDelayMs: 10, maxDelayMs: 100 },
+        },
+        logger,
+      );
+
+      await client.connect();
+      expect(receivedParams).toBeDefined();
+
+      // Only these top-level keys are allowed by ConnectParamsSchema (additionalProperties: false):
+      // minProtocol, maxProtocol, client, caps, commands, permissions, pathEnv, role, scopes,
+      // device, auth, locale, userAgent
+      const allowedKeys = new Set([
+        "minProtocol", "maxProtocol", "client", "caps", "commands", "permissions",
+        "pathEnv", "role", "scopes", "device", "auth", "locale", "userAgent",
+      ]);
+      const actualKeys = Object.keys(receivedParams!);
+      for (const key of actualKeys) {
+        expect(allowedKeys.has(key)).toBe(true);
+      }
+
+      client.disconnect();
+    });
+
+    it("connects successfully with server that enforces strict schema (no extra props)", async () => {
+      // Server that rejects any unknown properties in connect params (like the real OpenClaw server)
+      server.on("connection", (ws) => {
+        ws.send(JSON.stringify({
+          type: "event",
+          event: "connect.challenge",
+          payload: { nonce: "strict-nonce-xyz" },
+        }));
+        ws.on("message", (data) => {
+          const frame = JSON.parse(data.toString());
+          if (frame.method === "connect") {
+            // Strict schema validation: reject if any unknown root-level properties
+            const allowedKeys = new Set([
+              "minProtocol", "maxProtocol", "client", "caps", "commands", "permissions",
+              "pathEnv", "role", "scopes", "device", "auth", "locale", "userAgent",
+            ]);
+            const params = frame.params as Record<string, unknown>;
+            const unknownKeys = Object.keys(params).filter((k) => !allowedKeys.has(k));
+            if (unknownKeys.length > 0) {
               ws.send(JSON.stringify({
                 type: "res",
                 id: frame.id,
                 ok: false,
-                error: { code: "INVALID_REQUEST", message: "invalid challenge response" },
+                error: { code: "INVALID_REQUEST", message: `invalid connect params: at root: unexpected property '${unknownKeys[0]}'` },
               }));
-              ws.close(1008, "invalid challenge response");
+              ws.close(1008, `invalid connect params: at root: unexpected property '${unknownKeys[0]}'`);
               return;
             }
             ws.send(JSON.stringify({
@@ -463,7 +488,7 @@ describe("OpenClawClient", () => {
         logger,
       );
 
-      // With the fix, this should succeed because nonce is now included
+      // This must succeed -- our connect params must not have any unknown properties
       await client.connect();
       expect(client.isConnected()).toBe(true);
       client.disconnect();

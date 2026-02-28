@@ -73,8 +73,6 @@ interface EventFrame {
 interface ConnectParams {
   readonly minProtocol: number;
   readonly maxProtocol: number;
-  /** Challenge nonce echoed back from connect.challenge event. */
-  readonly nonce?: string | undefined;
   readonly client: {
     readonly id: string;
     readonly displayName?: string | undefined;
@@ -387,7 +385,6 @@ export class OpenClawClient extends EventEmitter {
     const connectParams: ConnectParams = {
       minProtocol: PROTOCOL_VERSION,
       maxProtocol: PROTOCOL_VERSION,
-      nonce: nonce ?? undefined,
       client: {
         id: CLIENT_ID,
         displayName: "Even G2 Voice Gateway",
