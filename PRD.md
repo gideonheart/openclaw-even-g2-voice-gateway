@@ -3,6 +3,10 @@
 ## 0) Purpose
 Build a production-ready, community-usable **Even G2 voice gateway module** for OpenClaw so users can talk to an OpenClaw agent from G2 glasses (Telegram-like flow), with pluggable STT providers and strict engineering quality (type safety + tests).
 
+> Repo split (current decision):
+> - Frontend EvenHub app lives in separate repo: `even-g2-openclaw-chat-app`
+> - This repo contains backend gateway/service + shared backend packages only.
+
 ---
 
 ## 1) Product Goals
@@ -34,7 +38,7 @@ Enable this end-to-end loop on Even G2:
 - Code quality: **DRY, SRP**, modular boundaries
 - UI layer: use **EvenRealities native UI approach/components**, aligned with:
   - https://github.com/KingAtoki/even-g2-apps
-- Config: all operational settings manageable from frontend settings menu and persisted safely
+- Config API is frontend-driven: EvenHub app manages settings UI and sends validated config updates to gateway endpoints
 - Testing approach: align with OpenClaw style (Vitest-centric)
 
 ---
@@ -179,7 +183,7 @@ Required pagination metadata:
 - prevent status animations from shifting bubble layout
 
 ### FR-5: Settings + Configuration
-Configurable from frontend settings menu:
+Configurable through frontend settings menu (in separate repo) via gateway settings API:
 - OpenClaw URL
 - OpenClaw auth token
 - Target session key
@@ -187,7 +191,9 @@ Configurable from frontend settings menu:
 - Provider-specific credentials/URLs
 - Timeout/retry knobs (advanced section)
 
-Persist settings with secure local storage strategy.
+Persistence strategy:
+- frontend persists UX-local preferences
+- gateway persists validated runtime integration settings (securely, no secret echo in logs)
 
 ### FR-6: Observability
 - On-page debug panel (full-height practical logs)
@@ -214,9 +220,8 @@ Persist settings with secure local storage strategy.
 ## 6.2 Proposed Structure
 
 ```
-apps/
-  g2-client/                # Even Hub frontend app (native UI style)
-  gateway-adapter/          # Node service: orchestration + API surface
+services/
+  gateway-api/              # Node service: orchestration + API surface
 
 packages/
   stt-contract/             # STT interfaces + shared types
@@ -238,9 +243,11 @@ docs/
   architecture.md
   security.md
   runbook.md
+  integration-frontend.md   # contract with even-g2-openclaw-chat-app repo
 ```
 
-No cross-layer shortcuts: apps depend on packages, not vice versa.
+No cross-layer shortcuts: service depends on packages, not vice versa.
+Frontend lives in separate repository and integrates through stable HTTP/WebSocket contracts.
 
 ---
 
