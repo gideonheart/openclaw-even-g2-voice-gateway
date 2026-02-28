@@ -71,7 +71,7 @@ Each task was committed atomically:
 2. **Task 2: Update ROADMAP.md progress table and phase details** - `7437496` (docs)
 3. **Task 3: Update OVERNIGHT_TODO.md and STATE.md, document remaining v1 gap** - `8653707` (docs)
 
-**Plan metadata:** TBD (docs: complete audit and reconcile plan)
+**Plan metadata:** `5bc4086` (docs: complete audit and reconcile plan)
 
 ## Files Created/Modified
 - `.planning/REQUIREMENTS.md` - Added Evidence column with commit hashes, updated all 31 requirement statuses, updated coverage section

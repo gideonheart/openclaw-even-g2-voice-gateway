@@ -71,7 +71,7 @@ Recent decisions affecting current work:
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | Continue execution from OVERNIGHT_TODO.md - TS strict contracts, Vitest tests, STT adapters, OpenClaw integration fixes | 2026-02-28 | 8aefd0f | [1-continue-execution-from-overnight-todo-m](./quick/1-continue-execution-from-overnight-todo-m/) |
-| 2 | Audit and reconcile planning state to actual delivered work | 2026-02-28 | TBD | [2-audit-and-reconcile...](./quick/2-audit-and-reconcile-planning-state-execu/) |
+| 2 | Audit and reconcile planning state to actual delivered work | 2026-02-28 | 5bc4086 | [2-audit-and-reconcile...](./quick/2-audit-and-reconcile-planning-state-execu/) |
 
 ## Session Continuity
 
