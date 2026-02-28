@@ -1,0 +1,37 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "Node16",
+    "moduleResolution": "Node16",
+    "lib": ["ES2022"],
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noPropertyAccessFromIndexSignature": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "composite": true,
+    "incremental": true,
+    "outDir": "dist"
+  },
+  "references": [
+    { "path": "packages/shared-types" },
+    { "path": "packages/stt-contract" },
+    { "path": "packages/logging" },
+    { "path": "packages/validation" },
+    { "path": "packages/stt-whisperx" },
+    { "path": "packages/stt-openai" },
+    { "path": "packages/stt-custom-http" },
+    { "path": "packages/openclaw-client" },
+    { "path": "packages/response-policy" },
+    { "path": "services/gateway-api" }
+  ],
+  "exclude": ["node_modules", "dist", "coverage"]
+}

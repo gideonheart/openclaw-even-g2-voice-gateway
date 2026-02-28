@@ -1,0 +1,25 @@
+{
+  "name": "@voice-gateway/gateway-api",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc --build",
+    "typecheck": "tsc --noEmit",
+    "start": "node dist/index.js",
+    "dev": "node --loader ts-node/esm src/index.ts"
+  },
+  "dependencies": {
+    "@voice-gateway/shared-types": "*",
+    "@voice-gateway/stt-contract": "*",
+    "@voice-gateway/stt-whisperx": "*",
+    "@voice-gateway/stt-openai": "*",
+    "@voice-gateway/stt-custom-http": "*",
+    "@voice-gateway/openclaw-client": "*",
+    "@voice-gateway/response-policy": "*",
+    "@voice-gateway/logging": "*",
+    "@voice-gateway/validation": "*"
+  }
+}

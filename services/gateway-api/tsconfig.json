@@ -1,0 +1,20 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "dist",
+    "composite": true
+  },
+  "include": ["src"],
+  "references": [
+    { "path": "../../packages/shared-types" },
+    { "path": "../../packages/stt-contract" },
+    { "path": "../../packages/stt-whisperx" },
+    { "path": "../../packages/stt-openai" },
+    { "path": "../../packages/stt-custom-http" },
+    { "path": "../../packages/openclaw-client" },
+    { "path": "../../packages/response-policy" },
+    { "path": "../../packages/logging" },
+    { "path": "../../packages/validation" }
+  ]
+}
