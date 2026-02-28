@@ -158,7 +158,7 @@ curl -X POST http://localhost:4400/api/settings \
 curl http://localhost:4400/api/settings
 ```
 
-**Note:** Changing provider-specific config (URLs, API keys) currently requires a restart. Provider *selection* (which provider is active) works immediately.
+**Note:** All config changes via the settings API take effect immediately without restart. STT provider config (URLs, API keys, model names) triggers provider re-initialization, and OpenClaw connection config (URL, auth token) triggers client reconnection. The next request after a config change will use the updated settings.
 
 ## Troubleshooting
 
