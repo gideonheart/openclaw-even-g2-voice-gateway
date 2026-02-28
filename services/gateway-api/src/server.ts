@@ -58,7 +58,7 @@ class RateLimiter {
 export interface ServerDeps {
   readonly configStore: ConfigStore;
   readonly sttProviders: Map<string, SttProvider>;
-  readonly openclawClient: OpenClawClient;
+  openclawClient: OpenClawClient;
   readonly logger: Logger;
   ready: boolean;
 }

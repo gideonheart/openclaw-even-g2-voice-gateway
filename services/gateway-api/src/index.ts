@@ -18,6 +18,7 @@ import { createGatewayServer, type ServerDeps } from "./server.js";
 import { loadConfig } from "./config-loader.js";
 import { ConfigStore } from "./config-store.js";
 import { registerProviderRebuilder } from "./provider-rebuilder.js";
+import { registerOpenClawRebuilder } from "./openclaw-rebuilder.js";
 
 const log = rootLogger.child({ component: "startup" });
 
@@ -37,9 +38,6 @@ async function main(): Promise<void> {
   // Initialize STT providers
   const sttProviders = buildSttProviders(config);
 
-  // PIPE-07: Re-initialize providers when their config section changes
-  registerProviderRebuilder(configStore, sttProviders, rootLogger);
-
   // Initialize OpenClaw client
   const openclawClient = new OpenClawClient(
     {
@@ -57,6 +55,11 @@ async function main(): Promise<void> {
     logger: rootLogger,
     ready: false,
   };
+
+  // PIPE-07: Re-initialize providers when their config section changes
+  registerProviderRebuilder(configStore, sttProviders, rootLogger);
+  // Re-initialize OpenClaw client when connection config changes
+  registerOpenClawRebuilder(configStore, deps, rootLogger);
 
   const server = createGatewayServer(deps);
 
