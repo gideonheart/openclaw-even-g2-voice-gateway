@@ -3,7 +3,53 @@
  */
 
 import type { GatewayConfig } from "@voice-gateway/shared-types";
-import { createSessionKey, createProviderId } from "@voice-gateway/shared-types";
+import {
+  createSessionKey,
+  createProviderId,
+  OperatorError,
+  ErrorCodes,
+} from "@voice-gateway/shared-types";
+
+/**
+ * NaN-safe parseInt wrapper. Returns defaultVal when raw is undefined/empty.
+ * Throws OperatorError(INVALID_CONFIG) when the parsed result is NaN.
+ */
+function safeParseInt(
+  raw: string | undefined,
+  defaultVal: number,
+  fieldName: string,
+): number {
+  if (raw === undefined || raw === "") return defaultVal;
+  const parsed = parseInt(raw, 10);
+  if (Number.isNaN(parsed)) {
+    throw new OperatorError(
+      ErrorCodes.INVALID_CONFIG,
+      `Invalid integer for ${fieldName}`,
+      `parseInt("${raw}", 10) returned NaN`,
+    );
+  }
+  return parsed;
+}
+
+/**
+ * NaN-safe parseInt that also enforces the value is positive (> 0).
+ * Throws OperatorError(INVALID_CONFIG) when NaN or non-positive.
+ */
+function safeParsePositiveInt(
+  raw: string | undefined,
+  defaultVal: number,
+  fieldName: string,
+): number {
+  const value = safeParseInt(raw, defaultVal, fieldName);
+  if (value <= 0) {
+    throw new OperatorError(
+      ErrorCodes.INVALID_CONFIG,
+      `${fieldName} must be positive`,
+      `Got ${value}`,
+    );
+  }
+  return value;
+}
 
 /** Load gateway configuration from environment variables. */
 export function loadConfig(env: Record<string, string | undefined> = process.env): GatewayConfig {
@@ -18,8 +64,8 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       baseUrl: env["WHISPERX_BASE_URL"] ?? "https://wsp.kingdom.lv",
       model: env["WHISPERX_MODEL"] ?? "medium",
       language: env["WHISPERX_LANGUAGE"] ?? "en",
-      pollIntervalMs: parseInt(env["WHISPERX_POLL_INTERVAL_MS"] ?? "3000", 10),
-      timeoutMs: parseInt(env["WHISPERX_TIMEOUT_MS"] ?? "300000", 10),
+      pollIntervalMs: safeParsePositiveInt(env["WHISPERX_POLL_INTERVAL_MS"], 3000, "WHISPERX_POLL_INTERVAL_MS"),
+      timeoutMs: safeParsePositiveInt(env["WHISPERX_TIMEOUT_MS"], 300000, "WHISPERX_TIMEOUT_MS"),
     },
     openai: {
       apiKey: env["OPENAI_API_KEY"] ?? "",
@@ -37,19 +83,21 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
       },
     },
     server: {
-      port: parseInt(env["PORT"] ?? "4400", 10),
+      port: safeParseInt(env["PORT"], 4400, "PORT"),
       host: env["HOST"] ?? "0.0.0.0",
       corsOrigins: (env["CORS_ORIGINS"] ?? "")
         .split(",")
         .map((s) => s.trim())
         .filter((s) => s.length > 0),
-      maxAudioBytes: parseInt(
-        env["MAX_AUDIO_BYTES"] ?? String(25 * 1024 * 1024),
-        10,
+      maxAudioBytes: safeParsePositiveInt(
+        env["MAX_AUDIO_BYTES"],
+        25 * 1024 * 1024,
+        "MAX_AUDIO_BYTES",
       ),
-      rateLimitPerMinute: parseInt(
-        env["RATE_LIMIT_PER_MINUTE"] ?? "60",
-        10,
+      rateLimitPerMinute: safeParsePositiveInt(
+        env["RATE_LIMIT_PER_MINUTE"],
+        60,
+        "RATE_LIMIT_PER_MINUTE",
       ),
     },
   };

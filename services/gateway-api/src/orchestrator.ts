@@ -14,7 +14,12 @@ import type {
   ProviderId,
   AudioPayload,
 } from "@voice-gateway/shared-types";
-import { createTurnId, ProviderIds } from "@voice-gateway/shared-types";
+import {
+  createTurnId,
+  ProviderIds,
+  OperatorError,
+  ErrorCodes,
+} from "@voice-gateway/shared-types";
 import type { SttProvider, SttContext } from "@voice-gateway/stt-contract";
 import type { OpenClawClient } from "@voice-gateway/openclaw-client";
 import { shapeResponse } from "@voice-gateway/response-policy";
@@ -49,7 +54,11 @@ export async function executeVoiceTurn(
   // Step 1: STT Transcription
   const provider = deps.sttProviders.get(deps.activeProviderId);
   if (!provider) {
-    throw new Error(`No STT provider registered for: ${deps.activeProviderId}`);
+    throw new OperatorError(
+      ErrorCodes.MISSING_CONFIG,
+      "STT provider not available",
+      `No STT provider registered for: ${deps.activeProviderId}`,
+    );
   }
 
   const sttCtx: SttContext = {
@@ -102,7 +111,7 @@ export async function executeVoiceTurn(
     },
     meta: {
       provider: deps.activeProviderId,
-      model: null,
+      model: null, // TODO(phase-2): thread SttResult.model when available
     },
   };
 

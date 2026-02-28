@@ -5,6 +5,7 @@ import {
   createTurnId,
   createSessionKey,
   ProviderIds,
+  OperatorError,
 } from "@voice-gateway/shared-types";
 import type { AudioPayload, SttResult, OpenClawInbound } from "@voice-gateway/shared-types";
 import type { SttProvider, SttContext } from "@voice-gateway/stt-contract";
@@ -102,6 +103,22 @@ describe("executeVoiceTurn", () => {
           logger: new Logger(),
         },
       ),
-    ).rejects.toThrow("No STT provider registered");
+    ).rejects.toThrow(OperatorError);
+
+    await expect(
+      executeVoiceTurn(
+        {
+          turnId: createTurnId("turn_no_provider_2"),
+          sessionKey: createSessionKey("test"),
+          audio: { data: Buffer.from(""), contentType: "audio/wav" },
+        },
+        {
+          sttProviders: new Map(),
+          activeProviderId: ProviderIds.WhisperX,
+          openclawClient: {} as any,
+          logger: new Logger(),
+        },
+      ),
+    ).rejects.toThrow(/STT provider not available/);
   });
 });

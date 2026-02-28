@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { loadConfig } from "./config-loader.js";
+import { OperatorError, ErrorCodes } from "@voice-gateway/shared-types";
 
 describe("loadConfig", () => {
   it("uses defaults when no env vars set", () => {
@@ -81,5 +82,27 @@ describe("loadConfig", () => {
     expect(() =>
       loadConfig({ STT_PROVIDER: "invalid" }),
     ).toThrow("Invalid ProviderId");
+  });
+
+  it("throws on non-numeric PORT", () => {
+    expect(() => loadConfig({ PORT: "abc" })).toThrow(OperatorError);
+    try {
+      loadConfig({ PORT: "abc" });
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperatorError);
+      expect((err as OperatorError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("throws on non-numeric WHISPERX_POLL_INTERVAL_MS", () => {
+    expect(() =>
+      loadConfig({ WHISPERX_POLL_INTERVAL_MS: "not-a-number" }),
+    ).toThrow(OperatorError);
+    try {
+      loadConfig({ WHISPERX_POLL_INTERVAL_MS: "not-a-number" });
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperatorError);
+      expect((err as OperatorError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
   });
 });
