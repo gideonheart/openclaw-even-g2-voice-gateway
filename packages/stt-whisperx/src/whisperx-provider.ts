@@ -86,6 +86,7 @@ export class WhisperXProvider implements SttProvider {
       language: result.language,
       confidence: result.confidence,
       providerId: this.providerId,
+      model: this.config.model,
       durationMs,
     };
   }

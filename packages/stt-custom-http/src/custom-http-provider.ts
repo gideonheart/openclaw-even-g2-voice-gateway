@@ -134,6 +134,7 @@ export class CustomHttpProvider implements SttProvider {
         language: typeof detectedLanguage === "string" ? detectedLanguage : language,
         confidence: typeof confidence === "number" ? confidence : null,
         providerId: this.providerId,
+        model: null,
         durationMs,
       };
     } catch (err) {

@@ -82,6 +82,7 @@ describe("Voice Turn Integration", () => {
         language: "en",
         confidence: null,
         providerId: ProviderIds.WhisperX,
+        model: "medium",
         durationMs: 200,
       }),
       healthCheck: vi.fn().mockResolvedValue({

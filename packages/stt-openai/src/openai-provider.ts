@@ -131,6 +131,7 @@ export class OpenAIProvider implements SttProvider {
         language: data.language ?? language,
         confidence: null, // Whisper API doesn't return confidence
         providerId: this.providerId,
+        model: this.config.model,
         durationMs,
       };
     } catch (err) {

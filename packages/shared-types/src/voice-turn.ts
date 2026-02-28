@@ -41,6 +41,8 @@ export interface SttResult {
   readonly confidence: number | null;
   /** Provider that produced this result. */
   readonly providerId: ProviderId;
+  /** Model name used for transcription (null if unknown). */
+  readonly model: string | null;
   /** Transcription duration in milliseconds. */
   readonly durationMs: number;
 }

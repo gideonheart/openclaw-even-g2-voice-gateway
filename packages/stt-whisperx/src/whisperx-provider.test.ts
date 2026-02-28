@@ -79,6 +79,7 @@ describe("WhisperXProvider", () => {
     expect(result.providerId).toBe("whisperx");
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
     expect(result.confidence).toBeNull();
+    expect(result.model).toBe("medium");
   });
 
   it("throws UserError on timeout", async () => {

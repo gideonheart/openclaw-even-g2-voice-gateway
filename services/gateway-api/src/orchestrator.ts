@@ -111,7 +111,7 @@ export async function executeVoiceTurn(
     },
     meta: {
       provider: deps.activeProviderId,
-      model: null, // TODO(phase-2): thread SttResult.model when available
+      model: sttResult.model ?? null,
     },
   };
 

@@ -25,6 +25,7 @@ describe("executeVoiceTurn", () => {
       language: "en",
       confidence: null,
       providerId: ProviderIds.WhisperX,
+      model: "medium",
       durationMs: 500,
     };
 
@@ -81,6 +82,7 @@ describe("executeVoiceTurn", () => {
     expect(result.reply.timing.agentMs).toBeGreaterThanOrEqual(0);
     expect(result.reply.timing.totalMs).toBeGreaterThanOrEqual(0);
     expect(result.reply.meta.provider).toBe("whisperx");
+    expect(result.reply.meta.model).toBe("medium");
 
     // Verify raw STT result returned
     expect(result.sttResult.text).toBe("Hello from the glasses");

@@ -59,6 +59,7 @@ describe("OpenAIProvider", () => {
     expect(result.text).toBe("Hello from OpenAI");
     expect(result.language).toBe("en");
     expect(result.providerId).toBe("openai");
+    expect(result.model).toBe("whisper-1");
     expect(result.durationMs).toBeGreaterThanOrEqual(0);
 
     // Verify auth header was sent

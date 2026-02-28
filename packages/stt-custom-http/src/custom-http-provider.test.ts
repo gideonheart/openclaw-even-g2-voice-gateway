@@ -68,6 +68,7 @@ describe("CustomHttpProvider", () => {
     expect(result.language).toBe("en");
     expect(result.confidence).toBe(0.92);
     expect(result.providerId).toBe("custom");
+    expect(result.model).toBeNull();
   });
 
   it("supports nested response field mapping", async () => {
