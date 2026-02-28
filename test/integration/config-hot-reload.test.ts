@@ -24,7 +24,6 @@ import type {
   GatewayConfig,
   GatewayReply,
   SafeGatewayConfig,
-  OpenClawOutbound,
 } from "@voice-gateway/shared-types";
 
 function makeConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
@@ -59,6 +58,97 @@ function makeMockProvider(model: string = "medium"): SttProvider {
       latencyMs: 5,
     }),
   };
+}
+
+/**
+ * Attach OpenClaw gateway protocol to a WebSocket server for hot-reload tests.
+ * Uses the proper connect.challenge -> connect -> hello-ok -> chat.send flow.
+ */
+function attachOpenClawProtocol(
+  wsServer: WebSocketServer,
+  responsePrefix: string,
+): void {
+  wsServer.on("connection", (ws) => {
+    let authenticated = false;
+
+    // Step 1: Send connect.challenge
+    ws.send(JSON.stringify({
+      type: "event",
+      event: "connect.challenge",
+      payload: { nonce: `nonce-${responsePrefix}` },
+    }));
+
+    ws.on("message", (data) => {
+      const frame = JSON.parse(data.toString()) as {
+        type: string;
+        id: string;
+        method: string;
+        params?: Record<string, unknown>;
+      };
+
+      if (frame.type !== "req" || !frame.id || !frame.method) {
+        ws.close(1008, "invalid request frame");
+        return;
+      }
+
+      if (!authenticated) {
+        if (frame.method !== "connect") {
+          ws.close(1008, "invalid handshake");
+          return;
+        }
+        authenticated = true;
+        ws.send(JSON.stringify({
+          type: "res",
+          id: frame.id,
+          ok: true,
+          payload: {
+            type: "hello-ok",
+            protocol: 3,
+            server: { version: "test", connId: `conn-${responsePrefix}` },
+            features: { methods: ["chat.send"], events: ["chat"] },
+            snapshot: { presence: [], stateVersion: { presence: 0, health: 0 } },
+            policy: { maxPayload: 1048576, maxBufferedBytes: 4194304, tickIntervalMs: 30000 },
+          },
+        }));
+        return;
+      }
+
+      if (frame.method === "chat.send") {
+        const params = frame.params as {
+          sessionKey: string;
+          message: string;
+          idempotencyKey: string;
+        };
+
+        // Send ack
+        ws.send(JSON.stringify({
+          type: "res",
+          id: frame.id,
+          ok: true,
+          payload: { runId: params.idempotencyKey, status: "started" },
+        }));
+
+        // Send final chat event with server-prefixed response
+        setTimeout(() => {
+          ws.send(JSON.stringify({
+            type: "event",
+            event: "chat",
+            payload: {
+              runId: params.idempotencyKey,
+              sessionKey: params.sessionKey,
+              seq: 0,
+              state: "final",
+              message: {
+                role: "assistant",
+                content: [{ type: "text", text: `${responsePrefix} response: ${params.message}` }],
+                timestamp: Date.now(),
+              },
+            },
+          }));
+        }, 10);
+      }
+    });
+  });
 }
 
 describe("Config Hot-Reload Integration", () => {
@@ -139,39 +229,17 @@ describe("Config Hot-Reload Integration", () => {
   // ── Test 2: OpenClaw client hot-reload ──
 
   it("OpenClaw client hot-reload: switching URL routes to new WS server", async () => {
-    // Start mock WS server A
+    // Start mock WS server A with proper OpenClaw protocol
     const wsServerA = new WebSocketServer({ port: 0 });
     const wsAddrA = wsServerA.address();
     const wsPortA = typeof wsAddrA === "object" && wsAddrA !== null ? wsAddrA.port : 0;
+    attachOpenClawProtocol(wsServerA, "Server-A");
 
-    wsServerA.on("connection", (ws) => {
-      ws.on("message", (data) => {
-        const msg = JSON.parse(data.toString()) as OpenClawOutbound;
-        ws.send(JSON.stringify({
-          turnId: msg.turnId,
-          sessionKey: msg.sessionKey,
-          text: `Server-A response: ${msg.text}`,
-          timestamp: new Date().toISOString(),
-        }));
-      });
-    });
-
-    // Start mock WS server B
+    // Start mock WS server B with proper OpenClaw protocol
     const wsServerB = new WebSocketServer({ port: 0 });
     const wsAddrB = wsServerB.address();
     const wsPortB = typeof wsAddrB === "object" && wsAddrB !== null ? wsAddrB.port : 0;
-
-    wsServerB.on("connection", (ws) => {
-      ws.on("message", (data) => {
-        const msg = JSON.parse(data.toString()) as OpenClawOutbound;
-        ws.send(JSON.stringify({
-          turnId: msg.turnId,
-          sessionKey: msg.sessionKey,
-          text: `Server-B response: ${msg.text}`,
-          timestamp: new Date().toISOString(),
-        }));
-      });
-    });
+    attachOpenClawProtocol(wsServerB, "Server-B");
 
     const mockProvider = makeMockProvider("medium");
     const providers = new Map<string, SttProvider>();

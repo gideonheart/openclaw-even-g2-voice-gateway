@@ -1,8 +1,9 @@
 /**
- * End-to-end integration test: Audio → STT → OpenClaw → GatewayReply
+ * End-to-end integration test: Audio -> STT -> OpenClaw -> GatewayReply
  *
- * Uses mocked STT provider and mock WebSocket server to verify
- * the complete pipeline without external dependencies.
+ * Uses mocked STT provider and mock OpenClaw gateway server (with proper
+ * protocol: connect.challenge -> connect -> hello-ok -> chat.send -> chat event)
+ * to verify the complete pipeline without external dependencies.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -18,7 +19,7 @@ import {
   ProviderIds,
 } from "@voice-gateway/shared-types";
 import type { SttProvider } from "@voice-gateway/stt-contract";
-import type { GatewayConfig, GatewayReply, OpenClawOutbound } from "@voice-gateway/shared-types";
+import type { GatewayConfig, GatewayReply } from "@voice-gateway/shared-types";
 
 function makeConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
   return {
@@ -34,6 +35,102 @@ function makeConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
   };
 }
 
+/**
+ * Attach OpenClaw gateway protocol to a WebSocket server.
+ * Implements: connect.challenge -> connect handshake -> chat.send -> chat events.
+ */
+function attachOpenClawProtocol(
+  wsServer: WebSocketServer,
+  responseBuilder: (message: string) => string = (msg) => `AI response to: ${msg}`,
+): void {
+  wsServer.on("connection", (ws) => {
+    let authenticated = false;
+
+    // Step 1: Send connect.challenge
+    ws.send(JSON.stringify({
+      type: "event",
+      event: "connect.challenge",
+      payload: { nonce: "integration-test-nonce" },
+    }));
+
+    ws.on("message", (data) => {
+      const frame = JSON.parse(data.toString()) as {
+        type: string;
+        id: string;
+        method: string;
+        params?: Record<string, unknown>;
+      };
+
+      // Validate frame structure
+      if (frame.type !== "req" || !frame.id || !frame.method) {
+        ws.close(1008, "invalid request frame");
+        return;
+      }
+
+      if (!authenticated) {
+        // Must be connect handshake
+        if (frame.method !== "connect") {
+          ws.close(1008, "invalid handshake: first request must be connect");
+          return;
+        }
+
+        authenticated = true;
+        ws.send(JSON.stringify({
+          type: "res",
+          id: frame.id,
+          ok: true,
+          payload: {
+            type: "hello-ok",
+            protocol: 3,
+            server: { version: "test", connId: "integration-conn-1" },
+            features: { methods: ["chat.send"], events: ["chat"] },
+            snapshot: { presence: [], stateVersion: { presence: 0, health: 0 } },
+            policy: { maxPayload: 1048576, maxBufferedBytes: 4194304, tickIntervalMs: 30000 },
+          },
+        }));
+        return;
+      }
+
+      // Handle chat.send
+      if (frame.method === "chat.send") {
+        const params = frame.params as {
+          sessionKey: string;
+          message: string;
+          idempotencyKey: string;
+        };
+
+        // Send ack
+        ws.send(JSON.stringify({
+          type: "res",
+          id: frame.id,
+          ok: true,
+          payload: { runId: params.idempotencyKey, status: "started" },
+        }));
+
+        // Send final chat event with response
+        const responseText = responseBuilder(params.message);
+        setTimeout(() => {
+          ws.send(JSON.stringify({
+            type: "event",
+            event: "chat",
+            payload: {
+              runId: params.idempotencyKey,
+              sessionKey: params.sessionKey,
+              seq: 0,
+              state: "final",
+              message: {
+                role: "assistant",
+                content: [{ type: "text", text: responseText }],
+                timestamp: Date.now(),
+              },
+            },
+          }));
+        }, 10);
+      }
+    });
+  });
+}
+
 describe("Voice Turn Integration", () => {
   let wsServer: WebSocketServer;
   let wsPort: number;
@@ -45,25 +142,10 @@ describe("Voice Turn Integration", () => {
     vi.spyOn(process.stdout, "write").mockReturnValue(true);
     vi.spyOn(process.stderr, "write").mockReturnValue(true);
 
-    // Start mock OpenClaw WebSocket server
+    // Start mock OpenClaw WebSocket server with proper protocol
     wsServer = new WebSocketServer({ port: 0 });
     const wsAddr = wsServer.address();
     wsPort = typeof wsAddr === "object" && wsAddr !== null ? wsAddr.port : 0;
-
-    // Echo bot: returns a response for every transcript
-    wsServer.on("connection", (ws) => {
-      ws.on("message", (data) => {
-        const msg = JSON.parse(data.toString()) as OpenClawOutbound;
-        ws.send(
-          JSON.stringify({
-            turnId: msg.turnId,
-            sessionKey: msg.sessionKey,
-            text: `AI response to: ${msg.text}`,
-            timestamp: new Date().toISOString(),
-          }),
-        );
-      });
-    });
   });
 
   afterEach(() => {
@@ -72,7 +154,10 @@ describe("Voice Turn Integration", () => {
     vi.restoreAllMocks();
   });
 
-  it("complete voice turn: audio → STT → OpenClaw → shaped response", async () => {
+  it("complete voice turn: audio -> STT -> OpenClaw -> shaped response", async () => {
+    // Attach OpenClaw protocol handler
+    attachOpenClawProtocol(wsServer, (msg) => `AI response to: ${msg}`);
+
     // Mock STT provider
     const mockProvider: SttProvider = {
       providerId: ProviderIds.WhisperX,
