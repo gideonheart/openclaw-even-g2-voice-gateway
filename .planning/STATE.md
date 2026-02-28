@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: 3 of 3 (complete)
 Plan: N/A (all plans complete)
 Status: Complete -- all 31/31 requirements delivered, all docs in place
-Last activity: 2026-02-28 - PIPE-07 committed, v1 milestone closed
+Last activity: 2026-02-28 - v1 release handoff document created with code review and hidden risks
 
 Progress: [██████████] 100%
 
@@ -46,7 +46,7 @@ Recent decisions affecting current work:
 - [Architecture]: Separate repos are authoritative -- frontend UI lives in `even-g2-openclaw-chat-app`; this repo is backend gateway only
 - [Architecture]: Split response responsibilities -- gateway returns transport-safe structured output; frontend owns viewport rendering/pagination
 - [Phase quick-1]: Local safeParseInt helper in config-loader for NaN-safe config parsing (throws OperatorError, not UserError)
-- [Phase quick-1]: In-memory IP-based RateLimiter class inside server.ts (adequate for Phase 1 single-instance)
+- [Phase quick-1]: In-memory IP-based RateLimiter class inside server.ts (adequate for Phase 1 single-instance; memory leak under diverse-IP load documented in RELEASE_HANDOFF.md)
 - [Phase 02-01]: ValidatedSettingsPatch uses Partial at both top and nested levels for flexible partial updates
 - [Phase 02-01]: Unknown fields silently ignored per research anti-pattern guidance
 - [Phase 02-01]: TypeError from branded constructors caught and rethrown as UserError(INVALID_CONFIG) for proper 400 responses
@@ -72,9 +72,10 @@ None -- all v1 requirements and documentation delivered.
 | 1 | Continue execution from OVERNIGHT_TODO.md - TS strict contracts, Vitest tests, STT adapters, OpenClaw integration fixes | 2026-02-28 | 8aefd0f | [1-continue-execution-from-overnight-todo-m](./quick/1-continue-execution-from-overnight-todo-m/) |
 | 2 | Audit and reconcile planning state to actual delivered work | 2026-02-28 | 5bc4086 | [2-audit-and-reconcile...](./quick/2-audit-and-reconcile-planning-state-execu/) |
 | 3 | Commit PIPE-07 and close v1 milestone | 2026-02-28 | d5df520 | [3-commit-pipe-07-and-close-milestone](./quick/3-commit-pipe-07-and-close-milestone/) |
+| 4 | v1 release handoff with code review, hidden risks, and priorities | 2026-02-28 | 913b66f | [4-final-wrap-up-review-last-3-commits-for-](./quick/4-final-wrap-up-review-last-3-commits-for-/) |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick-3 (Commit PIPE-07 and close v1 milestone -- all 31/31 requirements delivered)
+Stopped at: Completed quick-4 (v1 release handoff with code review, 6 hidden risks, and top 3 post-v1 priorities)
 Resume file: None
