@@ -168,14 +168,14 @@ export function validateSettingsPatch(body: unknown): ValidatedSettingsPatch {
   // ── Top-level scalars ──
 
   if ("openclawGatewayUrl" in raw && raw["openclawGatewayUrl"] !== undefined) {
-    patch.openclawGatewayUrl = validateUrl(
+    patch["openclawGatewayUrl"] = validateUrl(
       String(raw["openclawGatewayUrl"]),
       "openclawGatewayUrl",
     );
   }
 
   if ("openclawGatewayToken" in raw && raw["openclawGatewayToken"] !== undefined) {
-    patch.openclawGatewayToken = requireNonEmpty(
+    patch["openclawGatewayToken"] = requireNonEmpty(
       String(raw["openclawGatewayToken"]),
       "openclawGatewayToken",
     );
@@ -183,7 +183,7 @@ export function validateSettingsPatch(body: unknown): ValidatedSettingsPatch {
 
   if ("openclawSessionKey" in raw && raw["openclawSessionKey"] !== undefined) {
     try {
-      patch.openclawSessionKey = createSessionKey(String(raw["openclawSessionKey"]));
+      patch["openclawSessionKey"] = createSessionKey(String(raw["openclawSessionKey"]));
     } catch (err) {
       if (err instanceof TypeError) {
         throw new UserError(ErrorCodes.INVALID_CONFIG, err.message);
@@ -194,7 +194,7 @@ export function validateSettingsPatch(body: unknown): ValidatedSettingsPatch {
 
   if ("sttProvider" in raw && raw["sttProvider"] !== undefined) {
     try {
-      patch.sttProvider = createProviderId(String(raw["sttProvider"]));
+      patch["sttProvider"] = createProviderId(String(raw["sttProvider"]));
     } catch (err) {
       if (err instanceof TypeError) {
         throw new UserError(ErrorCodes.INVALID_CONFIG, err.message);
@@ -213,23 +213,23 @@ export function validateSettingsPatch(body: unknown): ValidatedSettingsPatch {
     const wx: Record<string, unknown> = {};
 
     if ("baseUrl" in wxRaw && wxRaw["baseUrl"] !== undefined) {
-      wx.baseUrl = validateUrl(String(wxRaw["baseUrl"]), "whisperx.baseUrl");
+      wx["baseUrl"] = validateUrl(String(wxRaw["baseUrl"]), "whisperx.baseUrl");
     }
     if ("model" in wxRaw && wxRaw["model"] !== undefined) {
-      wx.model = requireNonEmpty(String(wxRaw["model"]), "whisperx.model");
+      wx["model"] = requireNonEmpty(String(wxRaw["model"]), "whisperx.model");
     }
     if ("language" in wxRaw && wxRaw["language"] !== undefined) {
-      wx.language = requireNonEmpty(String(wxRaw["language"]), "whisperx.language");
+      wx["language"] = requireNonEmpty(String(wxRaw["language"]), "whisperx.language");
     }
     if ("pollIntervalMs" in wxRaw && wxRaw["pollIntervalMs"] !== undefined) {
-      wx.pollIntervalMs = validatePositiveInt(wxRaw["pollIntervalMs"], "whisperx.pollIntervalMs");
+      wx["pollIntervalMs"] = validatePositiveInt(wxRaw["pollIntervalMs"], "whisperx.pollIntervalMs");
     }
     if ("timeoutMs" in wxRaw && wxRaw["timeoutMs"] !== undefined) {
-      wx.timeoutMs = validatePositiveInt(wxRaw["timeoutMs"], "whisperx.timeoutMs");
+      wx["timeoutMs"] = validatePositiveInt(wxRaw["timeoutMs"], "whisperx.timeoutMs");
     }
 
     if (Object.keys(wx).length > 0) {
-      patch.whisperx = wx;
+      patch["whisperx"] = wx;
     }
   }
 
@@ -243,17 +243,17 @@ export function validateSettingsPatch(body: unknown): ValidatedSettingsPatch {
     const oai: Record<string, unknown> = {};
 
     if ("apiKey" in oaiRaw && oaiRaw["apiKey"] !== undefined) {
-      oai.apiKey = requireNonEmpty(String(oaiRaw["apiKey"]), "openai.apiKey");
+      oai["apiKey"] = requireNonEmpty(String(oaiRaw["apiKey"]), "openai.apiKey");
     }
     if ("model" in oaiRaw && oaiRaw["model"] !== undefined) {
-      oai.model = requireNonEmpty(String(oaiRaw["model"]), "openai.model");
+      oai["model"] = requireNonEmpty(String(oaiRaw["model"]), "openai.model");
     }
     if ("language" in oaiRaw && oaiRaw["language"] !== undefined) {
-      oai.language = requireNonEmpty(String(oaiRaw["language"]), "openai.language");
+      oai["language"] = requireNonEmpty(String(oaiRaw["language"]), "openai.language");
     }
 
     if (Object.keys(oai).length > 0) {
-      patch.openai = oai;
+      patch["openai"] = oai;
     }
   }
 
@@ -267,14 +267,14 @@ export function validateSettingsPatch(body: unknown): ValidatedSettingsPatch {
     const ch: Record<string, unknown> = {};
 
     if ("url" in chRaw && chRaw["url"] !== undefined) {
-      ch.url = validateUrl(String(chRaw["url"]), "customHttp.url");
+      ch["url"] = validateUrl(String(chRaw["url"]), "customHttp.url");
     }
     if ("authHeader" in chRaw && chRaw["authHeader"] !== undefined) {
-      ch.authHeader = requireNonEmpty(String(chRaw["authHeader"]), "customHttp.authHeader");
+      ch["authHeader"] = requireNonEmpty(String(chRaw["authHeader"]), "customHttp.authHeader");
     }
 
     if (Object.keys(ch).length > 0) {
-      patch.customHttp = ch;
+      patch["customHttp"] = ch;
     }
   }
 
