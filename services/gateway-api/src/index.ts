@@ -100,7 +100,7 @@ async function main(): Promise<void> {
   const shutdown = (): void => {
     log.info("Shutting down");
     deps.ready = false;
-    openclawClient.disconnect();
+    deps.openclawClient.disconnect();
     server.close(() => {
       log.info("Server closed");
       process.exit(0);
