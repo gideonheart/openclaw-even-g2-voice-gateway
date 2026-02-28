@@ -14,7 +14,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 
 - [x] **Phase 1: Core Voice Pipeline** - Monorepo foundation, WhisperX adapter, OpenClaw client, response shaping -- one complete voice turn end-to-end
 - [x] **Phase 2: Configuration and Hardening** - Settings API, readiness checks, runtime validation, secret protection, CORS, rate limiting
-- [~] **Phase 3: Provider Extensibility** - OpenAI and Custom HTTP adapters implemented; runtime provider switching partial (PIPE-07 gap)
+- [x] **Phase 3: Provider Extensibility** - OpenAI and Custom HTTP adapters, runtime provider switching, config-driven provider re-initialization
 
 ## Phase Details
 
@@ -60,15 +60,15 @@ Plans:
 
 Plans:
 - [x] stt-openai and stt-custom-http adapters implemented with unit + contract tests (commit 3901d54)
-- [ ] PIPE-07 gap: Runtime provider re-initialization on config change (TODO in index.ts)
+- [x] PIPE-07: Runtime provider re-initialization on config change via ConfigStore.onChange()
 
 ## Progress
 
 **Execution Order:**
-Phases 1 and 2 complete. Phase 3 near-complete (PIPE-07 provider re-init gap remaining).
+All three phases complete. 31/31 requirements delivered.
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
 | 1. Core Voice Pipeline | N/A (pre-planned work) | Complete | 2026-02-28 |
 | 2. Configuration and Hardening | 2/2 | Complete | 2026-02-28 |
-| 3. Provider Extensibility | N/A (pre-planned work) | Near-complete | - |
+| 3. Provider Extensibility | N/A (pre-planned work) | Complete | 2026-02-28 |

@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** A user wearing Even G2 glasses can tap to speak and reliably get an AI response back -- the gateway orchestrates audio to transcription to OpenClaw to shaped response without losing turns or leaking secrets.
-**Current focus:** v1 near-complete — PIPE-07 gap remaining
+**Current focus:** v1 milestone complete -- all 31/31 requirements delivered
 
 ## Current Position
 
-Phase: 3 of 3 (near-complete)
-Plan: N/A (audit complete)
-Status: Audit complete — 30/31 requirements delivered
-Last activity: 2026-02-28 - Reconciled planning state to actual delivered work
+Phase: 3 of 3 (complete)
+Plan: N/A (all plans complete)
+Status: Complete -- all 31/31 requirements delivered, all docs in place
+Last activity: 2026-02-28 - PIPE-07 committed, v1 milestone closed
 
 Progress: [██████████] 100%
 
@@ -58,8 +58,7 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-- PIPE-07 gap: Runtime provider re-initialization when provider-specific config changes via settings API (currently requires restart). TODO exists in services/gateway-api/src/index.ts.
-- Documentation: docs/architecture.md, docs/security.md, docs/runbook.md, .env.example, README quickstart (Section 7 of OVERNIGHT_TODO.md)
+None -- all v1 requirements and documentation delivered.
 
 ### Blockers/Concerns
 
@@ -72,9 +71,10 @@ Recent decisions affecting current work:
 |---|-------------|------|--------|-----------|
 | 1 | Continue execution from OVERNIGHT_TODO.md - TS strict contracts, Vitest tests, STT adapters, OpenClaw integration fixes | 2026-02-28 | 8aefd0f | [1-continue-execution-from-overnight-todo-m](./quick/1-continue-execution-from-overnight-todo-m/) |
 | 2 | Audit and reconcile planning state to actual delivered work | 2026-02-28 | 5bc4086 | [2-audit-and-reconcile...](./quick/2-audit-and-reconcile-planning-state-execu/) |
+| 3 | Commit PIPE-07 and close v1 milestone | 2026-02-28 | d5df520 | [3-commit-pipe-07-and-close-milestone](./quick/3-commit-pipe-07-and-close-milestone/) |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick-2 (Audit and reconcile planning state)
+Stopped at: Completed quick-3 (Commit PIPE-07 and close v1 milestone -- all 31/31 requirements delivered)
 Resume file: None
