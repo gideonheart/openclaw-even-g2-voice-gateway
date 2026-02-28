@@ -10,28 +10,28 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 ## Current Position
 
 Phase: 2 of 3 (Configuration and Hardening)
-Plan: 1 of 2 in current phase
-Status: Executing
-Last activity: 2026-02-28 - Completed 02-01-PLAN.md (ConfigStore class and settings validation)
+Plan: 2 of 2 in current phase
+Status: Phase Complete
+Last activity: 2026-02-28 - Completed 02-02-PLAN.md (Server ConfigStore wiring and hardening)
 
-Progress: [█████░░░░░] 50%
+Progress: [██████████] 100%
 
 ## Performance Metrics
 
 **Velocity:**
-- Total plans completed: 1
-- Average duration: 3 min
-- Total execution time: 0.05 hours
+- Total plans completed: 2
+- Average duration: 3.5 min
+- Total execution time: 0.12 hours
 
 **By Phase:**
 
 | Phase | Plans | Total | Avg/Plan |
 |-------|-------|-------|----------|
-| 02-configuration-and-hardening | 1 | 3 min | 3 min |
+| 02-configuration-and-hardening | 2 | 7 min | 3.5 min |
 
 **Recent Trend:**
-- Last 5 plans: 3 min
-- Trend: -
+- Last 5 plans: 3 min, 4 min
+- Trend: stable
 
 *Updated after each plan completion*
 
@@ -50,6 +50,11 @@ Recent decisions affecting current work:
 - [Phase 02-01]: ValidatedSettingsPatch uses Partial at both top and nested levels for flexible partial updates
 - [Phase 02-01]: Unknown fields silently ignored per research anti-pattern guidance
 - [Phase 02-01]: TypeError from branded constructors caught and rethrown as UserError(INVALID_CONFIG) for proper 400 responses
+- [Phase 02-02]: handleGetSettings uses ConfigStore.getSafe() directly, eliminating duplicated masking logic
+- [Phase 02-02]: Readiness gate exempts /healthz only (liveness probe must always respond)
+- [Phase 02-02]: Settings endpoint rate-limited using same RateLimiter instance as voice turn
+- [Phase 02-02]: Provider re-initialization deferred to Phase 3 with documented TODO
+- [Phase 02-02]: deps.ready set in listen callback to guarantee port is bound before accepting traffic
 
 ### Pending Todos
 
@@ -69,5 +74,5 @@ None yet.
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-01-PLAN.md (ConfigStore class and settings validation)
+Stopped at: Completed 02-02-PLAN.md (Server ConfigStore wiring and hardening) -- Phase 02 complete
 Resume file: None
