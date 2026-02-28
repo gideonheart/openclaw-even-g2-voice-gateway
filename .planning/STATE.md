@@ -47,7 +47,7 @@ None — v1.0 complete.
 |---|-------------|------|--------|-----------|
 | 9 | Push the 4 local commits to origin/master | 2026-02-28 | a5df743 | [9-push-the-4-local-commits-to-origin-maste](./quick/9-push-the-4-local-commits-to-origin-maste/) |
 | 10 | Push latest commit bda47bd to origin/master now, then report git status -sb and git log --oneline -3 to confirm sync. | 2026-02-28 | 6a3fe07 | [10-push-latest-commit-bda47bd-to-origin-mas](./quick/10-push-latest-commit-bda47bd-to-origin-mas/) |
-| 11 | Push 2 ahead commits (6a3fe07, 9b24709) to origin/master | 2026-02-28 | (push only) | [11-repo-still-ahead-2-after-quick-10-docs-c](./quick/11-repo-still-ahead-2-after-quick-10-docs-c/) |
+| 11 | Push 2 ahead commits (6a3fe07, 9b24709) to origin/master | 2026-02-28 | cc94ab4 | [11-repo-still-ahead-2-after-quick-10-docs-c](./quick/11-repo-still-ahead-2-after-quick-10-docs-c/) |
 
 ## Session Continuity
 
