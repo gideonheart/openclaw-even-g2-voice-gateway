@@ -17,13 +17,9 @@ import { ProviderIds } from "@voice-gateway/shared-types";
 import { createGatewayServer, type ServerDeps } from "./server.js";
 import { loadConfig } from "./config-loader.js";
 import { ConfigStore } from "./config-store.js";
+import { registerProviderRebuilder } from "./provider-rebuilder.js";
 
 const log = rootLogger.child({ component: "startup" });
-
-// TODO(phase-3): When provider-specific config changes (e.g., whisperx.baseUrl),
-// reconstruct the affected provider instance. For Phase 2, provider selection
-// (which provider is active) works immediately because the orchestrator reads
-// config per-request, but provider-specific settings (URLs, models) require restart.
 
 function buildSttProviders(cfg: GatewayConfig): Map<string, SttProvider> {
   const providers = new Map<string, SttProvider>();
@@ -40,6 +36,9 @@ async function main(): Promise<void> {
 
   // Initialize STT providers
   const sttProviders = buildSttProviders(config);
+
+  // PIPE-07: Re-initialize providers when their config section changes
+  registerProviderRebuilder(configStore, sttProviders, rootLogger);
 
   // Initialize OpenClaw client
   const openclawClient = new OpenClawClient(

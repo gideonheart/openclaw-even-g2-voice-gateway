@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
 import { ConfigStore, validateSettingsPatch } from "./config-store.js";
 import type { GatewayConfig, SafeGatewayConfig } from "@voice-gateway/shared-types";
 import { createProviderId, createSessionKey, UserError, ErrorCodes } from "@voice-gateway/shared-types";
@@ -135,6 +135,52 @@ describe("ConfigStore", () => {
       const updated = store.get();
       expect(updated.customHttp.url).toBe("https://new-stt.local");
       expect(updated.customHttp.authHeader).toBe("Bearer custom-token");
+    });
+  });
+
+  describe("onChange()", () => {
+    it("calls listener with patch and updated config after update()", () => {
+      const store = new ConfigStore(makeTestConfig());
+      const listener = vi.fn();
+      store.onChange(listener);
+
+      const patch = { whisperx: { baseUrl: "http://new-whisperx" } };
+      store.update(patch);
+
+      expect(listener).toHaveBeenCalledOnce();
+      expect(listener).toHaveBeenCalledWith(patch, store.get());
+      // Verify the config passed has the merged value
+      expect(listener.mock.calls[0][1].whisperx.baseUrl).toBe("http://new-whisperx");
+    });
+
+    it("calls multiple listeners in registration order", () => {
+      const store = new ConfigStore(makeTestConfig());
+      const order: number[] = [];
+      store.onChange(() => order.push(1));
+      store.onChange(() => order.push(2));
+      store.onChange(() => order.push(3));
+
+      store.update({ openclawGatewayUrl: "ws://changed:3000" });
+
+      expect(order).toEqual([1, 2, 3]);
+    });
+
+    it("listener receives fully merged config, not just the patch", () => {
+      const store = new ConfigStore(makeTestConfig());
+      const listener = vi.fn();
+      store.onChange(listener);
+
+      store.update({ whisperx: { model: "large" } });
+
+      const receivedConfig = listener.mock.calls[0][1];
+      // Merged field
+      expect(receivedConfig.whisperx.model).toBe("large");
+      // Preserved sibling fields
+      expect(receivedConfig.whisperx.baseUrl).toBe("https://wsp.kingdom.lv");
+      expect(receivedConfig.whisperx.language).toBe("en");
+      // Unmodified top-level fields
+      expect(receivedConfig.openclawGatewayUrl).toBe("ws://localhost:3000");
+      expect(receivedConfig.sttProvider).toBe("whisperx");
     });
   });
 });

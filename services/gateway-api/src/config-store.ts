@@ -45,6 +45,12 @@ export interface ValidatedSettingsPatch {
   readonly server?: Partial<ServerConfig>;
 }
 
+/** Callback fired after ConfigStore.update() with the patch and fully merged config. */
+export type ConfigChangeListener = (
+  patch: ValidatedSettingsPatch,
+  config: Readonly<GatewayConfig>,
+) => void;
+
 /**
  * Mutable configuration store with immutable read snapshots.
  *
@@ -52,12 +58,19 @@ export interface ValidatedSettingsPatch {
  * - `get()` — full config for internal consumers
  * - `getSafe()` — masked config for API responses (secrets hidden)
  * - `update()` — applies a validated partial patch
+ * - `onChange()` — registers a listener for config changes
  */
 export class ConfigStore {
   private config: GatewayConfig;
+  private readonly listeners: ConfigChangeListener[] = [];
 
   constructor(initial: GatewayConfig) {
     this.config = { ...initial };
+  }
+
+  /** Registers a listener that is called after every update() with the patch and new config. */
+  onChange(listener: ConfigChangeListener): void {
+    this.listeners.push(listener);
   }
 
   /** Returns the current full config (readonly view). */
@@ -123,6 +136,8 @@ export class ConfigStore {
         server: { ...this.config.server, ...patch.server },
       }),
     };
+
+    for (const fn of this.listeners) fn(patch, this.config);
   }
 }
 
