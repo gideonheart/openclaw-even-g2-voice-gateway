@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: 3 of 3 (complete)
 Plan: N/A (all plans complete)
 Status: Complete -- all 31/31 requirements delivered, all docs in place
-Last activity: 2026-02-28 - RateLimiter hardening with config refresh and eviction (quick-6)
+Last activity: 2026-02-28 - STT model metadata threading + config hot-reload integration tests (quick-7)
 
 Progress: [██████████] 100%
 
@@ -59,6 +59,8 @@ Recent decisions affecting current work:
 - [Quick-5]: ServerDeps.openclawClient made mutable (removed readonly) to allow runtime swapping
 - [Quick-6]: RateLimiter reads configStore.get().server.rateLimitPerMinute on every check() call (no onChange listener needed)
 - [Quick-6]: setInterval().unref() for prune to avoid keeping process alive during shutdown
+- [Quick-7]: Custom HTTP provider returns model: null since it has no model field in config
+- [Quick-7]: Rate limit hot-reload test uses configStore.update() directly to bypass shared rate limiter on POST /api/settings
 
 ### Pending Todos
 
@@ -79,9 +81,10 @@ None -- all v1 requirements and documentation delivered.
 | 4 | v1 release handoff with code review, hidden risks, and priorities | 2026-02-28 | 913b66f | [4-final-wrap-up-review-last-3-commits-for-](./quick/4-final-wrap-up-review-last-3-commits-for-/) |
 | 5 | OpenClaw client runtime re-initialization on config change | 2026-02-28 | d0f993b | [5-post-v1-hardening-openclaw-client-re-ini](./quick/5-post-v1-hardening-openclaw-client-re-ini/) |
 | 6 | RateLimiter hardening: config refresh, auto-prune, 10k hard cap | 2026-02-28 | f35385c | [6-post-v1-hardening-pass-2-address-ratelim](./quick/6-post-v1-hardening-pass-2-address-ratelim/) |
+| 7 | STT model metadata threading + config hot-reload integration tests | 2026-02-28 | 2b220de | [7-post-v1-hardening-pass-3-close-remaining](./quick/7-post-v1-hardening-pass-3-close-remaining/) |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick-6 (RateLimiter hardening: config-reactive reads, 60s auto-prune, 10k hard cap, 6 tests)
+Stopped at: Completed quick-7 (STT model metadata threading + 3 config hot-reload integration tests, 177 total tests)
 Resume file: None
