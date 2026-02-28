@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** A user wearing Even G2 glasses can tap to speak and reliably get an AI response back -- the gateway orchestrates audio to transcription to OpenClaw to shaped response without losing turns or leaking secrets.
-**Current focus:** Phase 2: Configuration and Hardening
+**Current focus:** v1 near-complete — PIPE-07 gap remaining
 
 ## Current Position
 
-Phase: 2 of 3 (Configuration and Hardening)
-Plan: 2 of 2 in current phase
-Status: Phase Complete
-Last activity: 2026-02-28 - Completed 02-02-PLAN.md (Server ConfigStore wiring and hardening)
+Phase: 3 of 3 (near-complete)
+Plan: N/A (audit complete)
+Status: Audit complete — 30/31 requirements delivered
+Last activity: 2026-02-28 - Reconciled planning state to actual delivered work
 
 Progress: [██████████] 100%
 
@@ -58,7 +58,8 @@ Recent decisions affecting current work:
 
 ### Pending Todos
 
-None yet.
+- PIPE-07 gap: Runtime provider re-initialization when provider-specific config changes via settings API (currently requires restart). TODO exists in services/gateway-api/src/index.ts.
+- Documentation: docs/architecture.md, docs/security.md, docs/runbook.md, .env.example, README quickstart (Section 7 of OVERNIGHT_TODO.md)
 
 ### Blockers/Concerns
 
@@ -70,9 +71,10 @@ None yet.
 | # | Description | Date | Commit | Directory |
 |---|-------------|------|--------|-----------|
 | 1 | Continue execution from OVERNIGHT_TODO.md - TS strict contracts, Vitest tests, STT adapters, OpenClaw integration fixes | 2026-02-28 | 8aefd0f | [1-continue-execution-from-overnight-todo-m](./quick/1-continue-execution-from-overnight-todo-m/) |
+| 2 | Audit and reconcile planning state to actual delivered work | 2026-02-28 | TBD | [2-audit-and-reconcile...](./quick/2-audit-and-reconcile-planning-state-execu/) |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed 02-02-PLAN.md (Server ConfigStore wiring and hardening) -- Phase 02 complete
+Stopped at: Completed quick-2 (Audit and reconcile planning state)
 Resume file: None
