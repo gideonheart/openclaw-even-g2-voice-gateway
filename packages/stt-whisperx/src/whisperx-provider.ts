@@ -204,7 +204,7 @@ export class WhisperXProvider implements SttProvider {
 
           switch (task.status) {
             case "completed": {
-              const text = task.result?.text ?? "";
+              const text = this.extractTranscriptText(task);
               if (text.length === 0) {
                 throw new UserError(
                   ErrorCodes.STT_TRANSCRIPTION_FAILED,
@@ -259,6 +259,29 @@ export class WhisperXProvider implements SttProvider {
         { once: true },
       );
     });
+  }
+
+  /**
+   * Extract transcript text from a completed WhisperX task.
+   *
+   * WhisperX (logingrupa/whisperX-FastAPI) returns transcription results
+   * primarily in `.result.segments[].text`. The top-level `.result.text`
+   * may be absent or empty. This mirrors the extraction logic used by
+   * the reference transcribe.sh script:
+   *   1. Join `.result.segments[].text` with spaces (standard output)
+   *   2. Fall back to `.result.text` if segments are absent
+   */
+  private extractTranscriptText(task: WhisperXTaskStatus): string {
+    const result = task.result;
+    if (!result) return "";
+
+    // Primary: join segment texts (standard WhisperX output)
+    if (result.segments && result.segments.length > 0) {
+      return result.segments.map((s) => s.text).join(" ").trim();
+    }
+
+    // Fallback: top-level text field
+    return result.text?.trim() ?? "";
   }
 
   private getExtension(contentType: string): string {

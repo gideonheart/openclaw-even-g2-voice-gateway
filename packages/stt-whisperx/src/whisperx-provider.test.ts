@@ -10,6 +10,11 @@ const TEST_AUDIO: AudioPayload = {
   contentType: "audio/wav",
 };
 
+const TEST_OGG_AUDIO: AudioPayload = {
+  data: Buffer.from("fake-ogg-opus-data"),
+  contentType: "audio/ogg",
+};
+
 function makeCtx(overrides?: Partial<SttContext>): SttContext {
   return {
     turnId: createTurnId("turn_test_1"),
@@ -151,6 +156,181 @@ describe("WhisperXProvider", () => {
     await expect(provider.transcribe(TEST_AUDIO, makeCtx())).rejects.toThrow(
       OperatorError,
     );
+  });
+
+  describe("segment-based transcript extraction", () => {
+    it("extracts text from result.segments (standard WhisperX output)", async () => {
+      const provider = new WhisperXProvider(
+        { baseUrl: "https://test.local", pollIntervalMs: 10, timeoutMs: 5000 },
+        logger,
+      );
+
+      // Mock submit
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ identifier: "task-seg-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      // Mock poll - completed with segments but no top-level text
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            identifier: "task-seg-1",
+            status: "completed",
+            result: {
+              language: "en",
+              segments: [
+                { text: "Hello from" },
+                { text: "the voice note" },
+              ],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const result = await provider.transcribe(TEST_OGG_AUDIO, makeCtx());
+
+      expect(result.text).toBe("Hello from the voice note");
+      expect(result.language).toBe("en");
+      expect(result.providerId).toBe("whisperx");
+    });
+
+    it("extracts text from segments when result.text is empty", async () => {
+      const provider = new WhisperXProvider(
+        { baseUrl: "https://test.local", pollIntervalMs: 10, timeoutMs: 5000 },
+        logger,
+      );
+
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ identifier: "task-seg-2" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      // Has both text (empty) and segments (populated)
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            identifier: "task-seg-2",
+            status: "completed",
+            result: {
+              text: "",
+              language: "en",
+              segments: [{ text: "Segment text here" }],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const result = await provider.transcribe(TEST_AUDIO, makeCtx());
+
+      expect(result.text).toBe("Segment text here");
+    });
+
+    it("falls back to result.text when segments are absent", async () => {
+      const provider = new WhisperXProvider(
+        { baseUrl: "https://test.local", pollIntervalMs: 10, timeoutMs: 5000 },
+        logger,
+      );
+
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ identifier: "task-seg-3" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      // Only has top-level text, no segments
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            identifier: "task-seg-3",
+            status: "completed",
+            result: { text: "Fallback text", language: "en" },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const result = await provider.transcribe(TEST_AUDIO, makeCtx());
+
+      expect(result.text).toBe("Fallback text");
+    });
+
+    it("throws UserError when both segments and text are empty", async () => {
+      const provider = new WhisperXProvider(
+        { baseUrl: "https://test.local", pollIntervalMs: 10, timeoutMs: 5000 },
+        logger,
+      );
+
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ identifier: "task-seg-4" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      // Completed but with empty segments and no text
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            identifier: "task-seg-4",
+            status: "completed",
+            result: { language: "en", segments: [] },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      await expect(
+        provider.transcribe(TEST_AUDIO, makeCtx()),
+      ).rejects.toThrow(UserError);
+    });
+
+    it("handles OGG audio with segments response (Telegram voice note path)", async () => {
+      const provider = new WhisperXProvider(
+        { baseUrl: "https://test.local", pollIntervalMs: 10, timeoutMs: 5000 },
+        logger,
+      );
+
+      // Mock submit
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ identifier: "task-ogg-1" }), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+
+      // Mock poll - completed with segments (typical WhisperX response for OGG voice notes)
+      fetchSpy.mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            identifier: "task-ogg-1",
+            status: "completed",
+            result: {
+              language: "en",
+              segments: [
+                { text: "This is a test" },
+                { text: "of the voice gateway" },
+              ],
+            },
+          }),
+          { status: 200, headers: { "Content-Type": "application/json" } },
+        ),
+      );
+
+      const result = await provider.transcribe(TEST_OGG_AUDIO, makeCtx());
+
+      expect(result.text).toBe("This is a test of the voice gateway");
+      expect(result.language).toBe("en");
+      expect(result.providerId).toBe("whisperx");
+      expect(result.model).toBe("medium");
+    });
   });
 
   describe("healthCheck", () => {
