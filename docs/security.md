@@ -74,6 +74,8 @@ In-memory per-IP rate limiting protects both voice turn and settings endpoints:
 - Configurable via `RATE_LIMIT_PER_MINUTE`
 - Returns `429` with `RATE_LIMITED` error code when exceeded
 - Window resets after 60 seconds
+- **Config-reactive:** Rate limit changes via `POST /api/settings` take effect immediately on the next request -- no restart needed. The `RateLimiter` reads the current `rateLimitPerMinute` from `ConfigStore` on every `check()` call.
+- **Auto-prune:** Expired rate-limit windows are automatically pruned every 60 seconds to prevent memory growth from diverse-IP traffic. A hard cap of 10,000 entries triggers eager pruning between intervals.
 
 ## Error Taxonomy (SAFE-04)
 
