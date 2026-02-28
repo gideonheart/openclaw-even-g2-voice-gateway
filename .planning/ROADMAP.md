@@ -12,9 +12,9 @@ This roadmap delivers a production-ready voice gateway in three phases, followin
 
 Decimal phases appear between their surrounding integers in numeric order.
 
-- [ ] **Phase 1: Core Voice Pipeline** - Monorepo foundation, WhisperX adapter, OpenClaw client, response shaping -- one complete voice turn end-to-end
-- [ ] **Phase 2: Configuration and Hardening** - Settings API, readiness checks, runtime validation, secret protection, CORS, rate limiting
-- [ ] **Phase 3: Provider Extensibility** - OpenAI and Custom HTTP adapters, runtime provider switching
+- [x] **Phase 1: Core Voice Pipeline** - Monorepo foundation, WhisperX adapter, OpenClaw client, response shaping -- one complete voice turn end-to-end
+- [x] **Phase 2: Configuration and Hardening** - Settings API, readiness checks, runtime validation, secret protection, CORS, rate limiting
+- [~] **Phase 3: Provider Extensibility** - OpenAI and Custom HTTP adapters implemented; runtime provider switching partial (PIPE-07 gap)
 
 ## Phase Details
 
@@ -28,12 +28,10 @@ Decimal phases appear between their surrounding integers in numeric order.
   3. The gateway maintains a persistent WebSocket connection to OpenClaw, sends transcripts on a configured session, and receives assistant responses without losing turns
   4. Network failures to WhisperX or OpenClaw trigger exponential backoff retries, and transient failures recover automatically
   5. Every voice turn is traceable end-to-end via a branded TurnId correlation ID present in all log entries, the outbound OpenClaw message, and the HTTP response
-**Plans**: TBD
+**Plans**: Implemented directly (pre-planning execution)
 
 Plans:
-- [ ] 01-01: TBD
-- [ ] 01-02: TBD
-- [ ] 01-03: TBD
+- [x] Implemented via overnight execution: monorepo scaffold, STT adapters, OpenClaw client, response policy, gateway API (commits 3dde320..09ad2fa)
 
 ### Phase 2: Configuration and Hardening
 **Goal**: The gateway is runtime-configurable from the chat app, validates all external input, protects secrets, and reports its own health -- ready for production use alongside OpenClaw
@@ -47,8 +45,8 @@ Plans:
 **Plans**: 2 plans
 
 Plans:
-- [ ] 02-01-PLAN.md — ConfigStore class, settings validation, error codes (TDD)
-- [ ] 02-02-PLAN.md — Wire ConfigStore into server, POST/GET settings, CORS hardening, startup gate
+- [x] 02-01-PLAN.md — ConfigStore class, settings validation, error codes (TDD)
+- [x] 02-02-PLAN.md — Wire ConfigStore into server, POST/GET settings, CORS hardening, startup gate
 
 ### Phase 3: Provider Extensibility
 **Goal**: The STT layer is genuinely pluggable -- adding the OpenAI and Custom HTTP adapters requires zero changes to the gateway orchestrator or SttProvider interface, and providers are switchable at runtime via settings
@@ -58,18 +56,19 @@ Plans:
   1. Switching the STT provider from WhisperX to OpenAI (or Custom HTTP) via the settings API produces a valid transcription through the same voice turn endpoint without code changes or restart
   2. The OpenAI adapter handles synchronous transcription via the official SDK, and the Custom HTTP adapter supports configurable URL, auth header, and request/response mapping
   3. All three providers pass an identical contract test suite verifying they accept the same input and produce conformant SttResult output
-**Plans**: TBD
+**Plans**: Largely implemented during Phase 1 execution
 
 Plans:
-- [ ] 03-01: TBD
+- [x] stt-openai and stt-custom-http adapters implemented with unit + contract tests (commit 3901d54)
+- [ ] PIPE-07 gap: Runtime provider re-initialization on config change (TODO in index.ts)
 
 ## Progress
 
 **Execution Order:**
-Phases execute in numeric order: 1 -> 2 -> 3
+Phases 1 and 2 complete. Phase 3 near-complete (PIPE-07 provider re-init gap remaining).
 
 | Phase | Plans Complete | Status | Completed |
 |-------|----------------|--------|-----------|
-| 1. Core Voice Pipeline | 0/3 | Not started | - |
-| 2. Configuration and Hardening | 0/2 | Not started | - |
-| 3. Provider Extensibility | 0/1 | Not started | - |
+| 1. Core Voice Pipeline | N/A (pre-planned work) | Complete | 2026-02-28 |
+| 2. Configuration and Hardening | 2/2 | Complete | 2026-02-28 |
+| 3. Provider Extensibility | N/A (pre-planned work) | Near-complete | - |
