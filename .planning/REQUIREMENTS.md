@@ -34,8 +34,8 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **CONF-01**: `POST /api/settings` validates and stores runtime configuration
 - [ ] **CONF-02**: `GET /api/settings` returns safe subset with secrets masked
-- [ ] **CONF-03**: Configurable: OpenClaw gateway URL, auth token, target session key
-- [ ] **CONF-04**: Configurable: STT provider selection and provider-specific credentials/URLs
+- [x] **CONF-03**: Configurable: OpenClaw gateway URL, auth token, target session key
+- [x] **CONF-04**: Configurable: STT provider selection and provider-specific credentials/URLs
 - [ ] **CONF-05**: Settings persisted securely — secrets never appear in API responses or logs
 
 ### Observability
@@ -50,7 +50,7 @@ Requirements for initial release. Each maps to roadmap phases.
 
 - [ ] **SAFE-01**: TypeScript strict mode with `noUncheckedIndexedAccess` and `exactOptionalPropertyTypes` — no `any` in core paths
 - [ ] **SAFE-02**: Branded types for critical identifiers (SessionKey, TurnId, ProviderId) preventing accidental misuse
-- [ ] **SAFE-03**: Runtime input validation at all external boundaries (HTTP payloads, provider responses, settings)
+- [x] **SAFE-03**: Runtime input validation at all external boundaries (HTTP payloads, provider responses, settings)
 - [ ] **SAFE-04**: Error taxonomy: `UserError` (safe message for chat app) and `OperatorError` (detailed for logs/debugging)
 - [ ] **SAFE-05**: Secret masking in all structured log output — auth headers, API keys, tokens never logged
 - [ ] **SAFE-06**: Request body size limits (max audio payload) and rate limiting per IP
@@ -118,8 +118,8 @@ Which phases cover which requirements. Updated during roadmap creation.
 | RESP-04 | Phase 1 | Pending |
 | CONF-01 | Phase 2 | Pending |
 | CONF-02 | Phase 2 | Pending |
-| CONF-03 | Phase 2 | Pending |
-| CONF-04 | Phase 2 | Pending |
+| CONF-03 | Phase 2 | Complete |
+| CONF-04 | Phase 2 | Complete |
 | CONF-05 | Phase 2 | Pending |
 | OPS-01 | Phase 1 | Pending |
 | OPS-02 | Phase 2 | Pending |
@@ -128,7 +128,7 @@ Which phases cover which requirements. Updated during roadmap creation.
 | OPS-05 | Phase 1 | Pending |
 | SAFE-01 | Phase 1 | Pending |
 | SAFE-02 | Phase 1 | Pending |
-| SAFE-03 | Phase 2 | Pending |
+| SAFE-03 | Phase 2 | Complete |
 | SAFE-04 | Phase 1 | Pending |
 | SAFE-05 | Phase 2 | Pending |
 | SAFE-06 | Phase 2 | Pending |
