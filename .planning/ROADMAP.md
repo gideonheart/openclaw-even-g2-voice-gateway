@@ -23,7 +23,7 @@ Decimal phases appear between their surrounding integers in numeric order.
 **Depends on**: Nothing (first phase)
 **Requirements**: PIPE-01, PIPE-02, PIPE-03, PIPE-04, CLAW-01, CLAW-02, CLAW-03, RESP-01, RESP-02, RESP-03, RESP-04, OPS-01, OPS-04, OPS-05, SAFE-01, SAFE-02, SAFE-04
 **Success Criteria** (what must be TRUE):
-  1. Sending a WAV audio payload to POST /api/voice/turn returns a JSON response containing the transcript text and a shaped assistant response with segments, timing breakdown, and provider metadata
+  1. Sending a WAV audio payload to POST /api/voice/turn returns a JSON response containing transcript text and a transport-safe assistant response envelope (fullText + optional coarse segments), timing breakdown, and provider metadata
   2. The WhisperX adapter handles the async submit-then-poll pattern with timeout and cancellation -- a hung WhisperX instance does not hang the gateway
   3. The gateway maintains a persistent WebSocket connection to OpenClaw, sends transcripts on a configured session, and receives assistant responses without losing turns
   4. Network failures to WhisperX or OpenClaw trigger exponential backoff retries, and transient failures recover automatically

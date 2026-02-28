@@ -58,7 +58,7 @@ A user wearing Even G2 glasses can tap to speak, and reliably get an AI response
 ## Context
 
 - **Chat app repo**: `/home/forge/bibele.kingdom.lv/samples/even-g2-openclaw-chat-app` — the Even Hub frontend that captures audio from glasses and displays responses. Communicates with this gateway over HTTP.
-- **Communication contract**: Chat app POSTs audio to `POST /api/voice/turn`, receives JSON with transcript + shaped response + pagination metadata. Settings via `POST/GET /api/settings`.
+- **Communication contract**: Chat app POSTs audio to `POST /api/voice/turn`, receives JSON with transcript + transport-safe assistant payload (`fullText`, optional coarse `segments`, timing/meta). Viewport pagination/virtualization is frontend-owned. Settings via `POST/GET /api/settings`.
 - **OpenClaw integration**: WebSocket connection to OpenClaw gateway, sending messages on a configured session and receiving agent responses.
 - **WhisperX reference**: Uses Rolands' fork at `https://github.com/logingrupa/whisperX-FastAPI`. POST audio to `/speech-to-text`, poll task endpoint until complete.
 - **WhisperX skill/runbook**: `/home/forge/.openclaw/workspace/skills/whisperx/SKILL.md`
@@ -86,7 +86,7 @@ A user wearing Even G2 glasses can tap to speak, and reliably get an AI response
 | Monorepo with packages/ | Clean boundaries for STT adapters, OpenClaw client, response policy — enables reuse | — Pending |
 | HTTP API surface for chat app | Simpler browser compatibility, CORS-friendly, chat app makes standard fetch calls | — Pending |
 | WebSocket for OpenClaw | Live connection to OpenClaw gateway protocol for real-time session messaging | — Pending |
-| Gateway owns response shaping | Pagination/truncation logic lives in gateway so chat app stays thin | — Pending |
+| Split response responsibilities | Gateway does transport-safe normalization/chunk safety; frontend owns viewport pagination/virtualization/rendering | — Accepted |
 | WhisperX as default provider | Self-hosted, private, no vendor lock-in — best for community self-hosters | — Pending |
 
 ---

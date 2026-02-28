@@ -43,7 +43,8 @@ Decisions are logged in PROJECT.md Key Decisions table.
 Recent decisions affecting current work:
 
 - [Roadmap]: 3-phase quick-depth roadmap -- foundation pipeline first, configuration/hardening second, provider extensibility third
-- [Roadmap]: Phase 1 carries 17 requirements because the end-to-end pipeline is one coherent delivery boundary -- you cannot verify any piece independently
+- [Architecture]: Separate repos are authoritative -- frontend UI lives in `even-g2-openclaw-chat-app`; this repo is backend gateway only
+- [Architecture]: Split response responsibilities -- gateway returns transport-safe structured output; frontend owns viewport rendering/pagination
 
 ### Pending Todos
 
