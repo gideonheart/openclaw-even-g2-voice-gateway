@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: 3 of 3 (complete)
 Plan: N/A (all plans complete)
 Status: Complete -- all 31/31 requirements delivered, all docs in place
-Last activity: 2026-02-28 - OpenClaw client runtime re-initialization on config change (quick-5)
+Last activity: 2026-02-28 - RateLimiter hardening with config refresh and eviction (quick-6)
 
 Progress: [██████████] 100%
 
@@ -57,6 +57,8 @@ Recent decisions affecting current work:
 - [Phase 02-02]: deps.ready set in listen callback to guarantee port is bound before accepting traffic
 - [Quick-5]: OpenClaw rebuilder follows exact same pattern as provider-rebuilder for consistency
 - [Quick-5]: ServerDeps.openclawClient made mutable (removed readonly) to allow runtime swapping
+- [Quick-6]: RateLimiter reads configStore.get().server.rateLimitPerMinute on every check() call (no onChange listener needed)
+- [Quick-6]: setInterval().unref() for prune to avoid keeping process alive during shutdown
 
 ### Pending Todos
 
@@ -76,9 +78,10 @@ None -- all v1 requirements and documentation delivered.
 | 3 | Commit PIPE-07 and close v1 milestone | 2026-02-28 | d5df520 | [3-commit-pipe-07-and-close-milestone](./quick/3-commit-pipe-07-and-close-milestone/) |
 | 4 | v1 release handoff with code review, hidden risks, and priorities | 2026-02-28 | 913b66f | [4-final-wrap-up-review-last-3-commits-for-](./quick/4-final-wrap-up-review-last-3-commits-for-/) |
 | 5 | OpenClaw client runtime re-initialization on config change | 2026-02-28 | d0f993b | [5-post-v1-hardening-openclaw-client-re-ini](./quick/5-post-v1-hardening-openclaw-client-re-ini/) |
+| 6 | RateLimiter hardening: config refresh, auto-prune, 10k hard cap | 2026-02-28 | f35385c | [6-post-v1-hardening-pass-2-address-ratelim](./quick/6-post-v1-hardening-pass-2-address-ratelim/) |
 
 ## Session Continuity
 
 Last session: 2026-02-28
-Stopped at: Completed quick-5 (OpenClaw client runtime re-initialization on config change, 6 new tests, corrected runbook)
+Stopped at: Completed quick-6 (RateLimiter hardening: config-reactive reads, 60s auto-prune, 10k hard cap, 6 tests)
 Resume file: None
