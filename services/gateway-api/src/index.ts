@@ -61,7 +61,7 @@ async function main(): Promise<void> {
     });
   });
 
-  // Graceful shutdown
+  // Graceful shutdown with bounded timeout
   const shutdown = (): void => {
     log.info("Shutting down");
     openclawClient.disconnect();
@@ -69,6 +69,11 @@ async function main(): Promise<void> {
       log.info("Server closed");
       process.exit(0);
     });
+    // Force exit after 10 seconds if connections hang
+    setTimeout(() => {
+      log.warn("Forced shutdown after timeout");
+      process.exit(1);
+    }, 10_000).unref();
   };
 
   process.on("SIGTERM", shutdown);

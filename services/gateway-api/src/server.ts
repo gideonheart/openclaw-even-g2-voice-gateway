@@ -32,6 +32,28 @@ import { validateAudioContentType, validateAudioSize } from "@voice-gateway/vali
 import { executeVoiceTurn } from "./orchestrator.js";
 import type { Logger } from "@voice-gateway/logging";
 
+// ── Rate Limiter ──
+
+class RateLimiter {
+  private readonly windows = new Map<string, { count: number; resetAt: number }>();
+  private readonly maxPerMinute: number;
+
+  constructor(maxPerMinute: number) {
+    this.maxPerMinute = maxPerMinute;
+  }
+
+  check(key: string): boolean {
+    const now = Date.now();
+    const window = this.windows.get(key);
+    if (!window || now >= window.resetAt) {
+      this.windows.set(key, { count: 1, resetAt: now + 60_000 });
+      return true;
+    }
+    window.count++;
+    return window.count <= this.maxPerMinute;
+  }
+}
+
 export interface ServerDeps {
   readonly config: GatewayConfig;
   readonly sttProviders: Map<string, SttProvider>;
@@ -42,6 +64,7 @@ export interface ServerDeps {
 /** Create and return the HTTP server (not yet listening). */
 export function createGatewayServer(deps: ServerDeps): Server {
   const log = deps.logger.child({ component: "http-server" });
+  const rateLimiter = new RateLimiter(deps.config.server.rateLimitPerMinute);
 
   const server = createServer(async (req, res) => {
     const turnId = createTurnId();
@@ -56,6 +79,12 @@ export function createGatewayServer(deps: ServerDeps): Server {
 
       // Route
       if (method === "POST" && url === "/api/voice/turn") {
+        // Rate limit the expensive voice turn endpoint
+        const clientIp = req.socket.remoteAddress ?? "unknown";
+        if (!rateLimiter.check(clientIp)) {
+          sendJson(res, 429, { error: "Too many requests. Please wait.", code: "RATE_LIMITED" });
+          return;
+        }
         await handleVoiceTurn(req, res, deps, turnId, requestLog);
       } else if (method === "POST" && url === "/api/settings") {
         await handlePostSettings(req, res, requestLog);
@@ -262,10 +291,12 @@ function readBody(
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let totalBytes = 0;
+    let rejected = false;
 
     req.on("data", (chunk: Buffer) => {
       totalBytes += chunk.length;
       if (totalBytes > maxBytes) {
+        rejected = true;
         req.destroy();
         reject(
           new UserError(
@@ -279,10 +310,11 @@ function readBody(
     });
 
     req.on("end", () => {
-      resolve(Buffer.concat(chunks));
+      if (!rejected) resolve(Buffer.concat(chunks));
     });
 
     req.on("error", (err) => {
+      if (rejected) return;
       reject(
         new OperatorError(
           ErrorCodes.INTERNAL_ERROR,

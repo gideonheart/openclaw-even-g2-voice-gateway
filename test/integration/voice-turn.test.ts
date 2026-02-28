@@ -229,4 +229,47 @@ describe("Voice Turn Integration", () => {
     const response = await fetch(`http://127.0.0.1:${httpPort}/nope`);
     expect(response.status).toBe(404);
   });
+
+  it("returns 429 when rate limit exceeded", async () => {
+    const config = makeConfig({
+      server: {
+        ...makeConfig().server,
+        rateLimitPerMinute: 2,
+      },
+    });
+
+    httpServer = createGatewayServer({
+      config,
+      sttProviders: new Map(),
+      openclawClient: new OpenClawClient({}, logger),
+      logger,
+    });
+
+    await new Promise<void>((resolve) => {
+      httpServer.listen(0, "127.0.0.1", resolve);
+    });
+    const httpAddr = httpServer.address();
+    httpPort =
+      typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
+
+    const sendRequest = (): Promise<Response> =>
+      fetch(`http://127.0.0.1:${httpPort}/api/voice/turn`, {
+        method: "POST",
+        headers: { "Content-Type": "audio/wav" },
+        body: Buffer.from("fake-audio"),
+      });
+
+    // First 2 requests go through (they will fail with provider error, but not 429)
+    const response1 = await sendRequest();
+    const response2 = await sendRequest();
+    expect(response1.status).not.toBe(429);
+    expect(response2.status).not.toBe(429);
+
+    // Third request should be rate limited
+    const response3 = await sendRequest();
+    expect(response3.status).toBe(429);
+    const body = (await response3.json()) as { error: string; code: string };
+    expect(body.code).toBe("RATE_LIMITED");
+    expect(body.error).toBe("Too many requests. Please wait.");
+  });
 });
