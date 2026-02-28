@@ -35,23 +35,49 @@ import { ConfigStore, validateSettingsPatch } from "./config-store.js";
 
 // ── Rate Limiter ──
 
-class RateLimiter {
+export class RateLimiter {
   private readonly windows = new Map<string, { count: number; resetAt: number }>();
-  private readonly maxPerMinute: number;
+  private readonly configStore: ConfigStore;
+  private readonly pruneHandle: ReturnType<typeof setInterval>;
 
-  constructor(maxPerMinute: number) {
-    this.maxPerMinute = maxPerMinute;
+  constructor(configStore: ConfigStore) {
+    this.configStore = configStore;
+    this.pruneHandle = setInterval(() => this.prune(), 60_000);
+    this.pruneHandle.unref();
   }
 
   check(key: string): boolean {
     const now = Date.now();
+    const maxPerMinute = this.configStore.get().server.rateLimitPerMinute;
     const window = this.windows.get(key);
     if (!window || now >= window.resetAt) {
       this.windows.set(key, { count: 1, resetAt: now + 60_000 });
-      return true;
+    } else {
+      window.count++;
+      if (window.count > maxPerMinute) return false;
     }
-    window.count++;
-    return window.count <= this.maxPerMinute;
+
+    // Hard cap: eager prune if map grows beyond 10,000 entries
+    if (this.windows.size > 10_000) {
+      this.prune();
+    }
+
+    return true;
+  }
+
+  /** Remove expired windows to prevent unbounded memory growth. */
+  prune(): void {
+    const now = Date.now();
+    for (const [key, entry] of this.windows) {
+      if (now >= entry.resetAt) {
+        this.windows.delete(key);
+      }
+    }
+  }
+
+  /** Clean up the prune interval (for test teardown and graceful shutdown). */
+  destroy(): void {
+    clearInterval(this.pruneHandle);
   }
 }
 
@@ -66,7 +92,7 @@ export interface ServerDeps {
 /** Create and return the HTTP server (not yet listening). */
 export function createGatewayServer(deps: ServerDeps): Server {
   const log = deps.logger.child({ component: "http-server" });
-  const rateLimiter = new RateLimiter(deps.configStore.get().server.rateLimitPerMinute);
+  const rateLimiter = new RateLimiter(deps.configStore);
 
   const server = createServer(async (req, res) => {
     const turnId = createTurnId();
