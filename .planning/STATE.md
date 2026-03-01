@@ -5,14 +5,14 @@
 See: .planning/PROJECT.md (updated 2026-02-28)
 
 **Core value:** A user wearing Even G2 glasses can tap to speak and reliably get an AI response back -- the gateway orchestrates audio to transcription to OpenClaw to shaped response without losing turns or leaking secrets.
-**Current focus:** v1.0 shipped — planning next milestone
+**Current focus:** v1.0 shipped -- PARKED-IDLE mode active (see CLAUDE.md)
 
 ## Current Position
 
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
-Status: Parked -- scope-retention fix complete, waiting for explicit next assignment
-Last activity: 2026-03-01 - Completed quick task 16: Final handoff for shared-secret scope-retention fix
+Status: PARKED-IDLE -- responds only to explicit engineering tasks
+Last activity: 2026-03-01 - Entered parked-idle mode (quick-17)
 
 Progress: [██████████] 100% (v1.0)
 
@@ -54,9 +54,10 @@ None — v1.0 complete.
 | 14 | Ground truth verify scope fix: commits confirmed, 31/31 auth e2e tests pass | 2026-03-01 | 04ef11d | [14-ground-truth-check-confirm-scope-retenti](./quick/14-ground-truth-check-confirm-scope-retenti/) |
 | 15 | Self-review: security audit 5/5 pass, client/server alignment verified, 223/223 tests green | 2026-03-01 | b76e547 | [15-self-review-last-commits-for-shared-secr](./quick/15-self-review-last-commits-for-shared-secr/) |
 | 16 | Final handoff: scope-retention fix commits, files, tests, security -- parked | 2026-03-01 | 79bf6b6 | [16-finalize-and-park-give-a-concise-final-h](./quick/16-finalize-and-park-give-a-concise-final-h/) |
+| 17 | Enter parked-idle mode: CLAUDE.md directive to respond PARKED_NOOP when no explicit task given | 2026-03-01 | ee84bfe | [17-enter-parked-idle-mode-when-resumed-with](./quick/17-enter-parked-idle-mode-when-resumed-with/) |
 
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Parked after quick-16 handoff. No open tasks.
+Stopped at: Parked-idle mode active. CLAUDE.md governs resume behavior.
 Resume file: None
