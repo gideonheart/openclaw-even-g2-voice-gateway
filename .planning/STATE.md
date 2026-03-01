@@ -59,7 +59,7 @@ None — v1.0 complete.
 | 15 | Self-review: security audit 5/5 pass, client/server alignment verified, 223/223 tests green | 2026-03-01 | b76e547 | [15-self-review-last-commits-for-shared-secr](./quick/15-self-review-last-commits-for-shared-secr/) |
 | 16 | Final handoff: scope-retention fix commits, files, tests, security -- parked | 2026-03-01 | 79bf6b6 | [16-finalize-and-park-give-a-concise-final-h](./quick/16-finalize-and-park-give-a-concise-final-h/) |
 | 17 | Enter parked-idle mode: CLAUDE.md directive to respond PARKED_NOOP when no explicit task given | 2026-03-01 | ee84bfe | [17-enter-parked-idle-mode-when-resumed-with](./quick/17-enter-parked-idle-mode-when-resumed-with/) |
-| 18 | Investigate startup blocker: stale gateway token fixed, WhisperX unreachable (external) | 2026-03-01 | (docs only) | [18-investigate-and-resolve-startup-blocker](./quick/18-investigate-and-resolve-startup-blocker/) |
+| 18 | Investigate startup blocker: stale gateway token fixed, WhisperX unreachable (external) | 2026-03-01 | 3654d92 | [18-investigate-and-resolve-startup-blocker](./quick/18-investigate-and-resolve-startup-blocker/) |
 
 ## Session Continuity
 
