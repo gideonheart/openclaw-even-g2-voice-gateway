@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
 Status: Milestone v1.0 archived — ready for next milestone
-Last activity: 2026-03-01 - Completed quick task 14: Ground truth verification of scope fix (quick-13). Both commits (4d1fb3e9f scope guard, 801fa7fe8 tests) confirmed in /home/forge/openclaw. 31/31 auth e2e tests pass. Scope retention fix is COMPLETE.
+Last activity: 2026-03-01 - Completed quick task 15: Self-review of scope retention fix. Security audit 5/5 checks pass, client/server alignment verified, 223/223 tests green. No code gaps found.
 
 Progress: [██████████] 100% (v1.0)
 
@@ -20,10 +20,10 @@ Progress: [██████████] 100% (v1.0)
 
 **v1.0 Summary:**
 - Total phases: 3
-- Total plans: 2 formal + 12 quick tasks
+- Total plans: 2 formal + 15 quick tasks
 - Requirements: 31/31 satisfied
 - LOC: 7,138 TypeScript
-- Tests: 177 passing
+- Tests: 192 passing
 - Timeline: ~10.5 hours
 
 ## Accumulated Context
@@ -51,9 +51,10 @@ None — v1.0 complete.
 | 12 | Push 2fc85c5 to origin/master, smoke check OGG voice-turn path | 2026-02-28 | 325eb4b | [12-push-commit-2fc85c5-to-origin-master-and](./quick/12-push-commit-2fc85c5-to-origin-master-and/) |
 | 13 | Fix OpenClaw shared-secret scope retention (!sharedAuthOk guard) | 2026-02-28 | 4d1fb3e (openclaw) | [13-ground-truth-check-confirm-scope-retenti](./quick/13-ground-truth-check-confirm-scope-retenti/) |
 | 14 | Ground truth verify scope fix: commits confirmed, 31/31 auth e2e tests pass | 2026-03-01 | 04ef11d | [14-ground-truth-check-confirm-scope-retenti](./quick/14-ground-truth-check-confirm-scope-retenti/) |
+| 15 | Self-review: security audit 5/5 pass, client/server alignment verified, 223/223 tests green | 2026-03-01 | b76e547 | [15-self-review-last-commits-for-shared-secr](./quick/15-self-review-last-commits-for-shared-secr/) |
 
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed quick-14: ground truth verification of scope retention fix — 31/31 auth e2e tests pass, quick-13 COMPLETE
+Stopped at: Completed quick-15: self-review of scope retention fix — security audit 5/5 pass, 223/223 tests green, no gaps
 Resume file: None
