@@ -9,17 +9,37 @@ This repo is **backend gateway only**. The frontend chat app lives in a separate
 ## System Context
 
 ```
-┌─────────────────────┐     HTTP POST       ┌──────────────────────┐
-│  Even G2 Chat App   │ ──────────────────►  │   Voice Gateway      │
-│  (separate repo)    │ ◄──────────────────  │   (this repo)        │
-└─────────────────────┘   JSON response      └──────┬───────┬───────┘
-                                                     │       │
-                                           STT API   │       │  WebSocket
-                                                     ▼       ▼
-                                              ┌──────────┐ ┌──────────┐
-                                              │ STT      │ │ OpenClaw │
-                                              │ Provider │ │ Gateway  │
-                                              └──────────┘ └──────────┘
+┌─────────────────────┐                          ┌──────────────────────┐
+│  Even G2 Chat App   │   HTTP POST :4400        │   Voice Gateway      │
+│  (separate repo)    │ ───────────────────────►  │   (this repo)        │
+│                     │ ◄───────────────────────  │   PORT=4400          │
+└─────────────────────┘   JSON response           └──────┬───────┬───────┘
+                                                         │       │
+                                                STT API  │       │  WebSocket
+                                                         │       │  :3434
+                                                         ▼       ▼
+                                                  ┌──────────┐ ┌──────────┐
+                                                  │ STT      │ │ OpenClaw │
+                                                  │ Provider │ │ Gateway  │
+                                                  └──────────┘ └──────────┘
+```
+
+## Connection URLs
+
+The gateway participates in two network roles:
+
+| Role | Variable | Default | Description |
+|------|----------|---------|-------------|
+| **Listen** (inbound) | `PORT` | `4400` | Where the gateway accepts requests from the G2 chat app |
+| **Connect** (outbound) | `OPENCLAW_GATEWAY_URL` | `ws://localhost:3000` | Where the gateway connects to OpenClaw as a WebSocket client |
+
+The gateway binds to `HOST=0.0.0.0` by default (all interfaces). Remote G2 frontends should target `ws://<server-ip>:4400` rather than `localhost`.
+
+### End-to-End Connection Flow
+
+```
+G2 Frontend --> ws://{gateway-host}:4400 --> Voice Gateway --> ws://{openclaw-host}:3434 --> OpenClaw
+                (PORT, inbound)                               (OPENCLAW_GATEWAY_URL, outbound)
 ```
 
 ## Monorepo Structure
