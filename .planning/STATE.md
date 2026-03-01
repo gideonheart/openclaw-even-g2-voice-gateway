@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
 Status: PARKED-IDLE -- responds only to explicit engineering tasks
-Last activity: 2026-03-01 - Entered parked-idle mode (quick-17)
+Last activity: 2026-03-01 - Investigated startup blocker (quick-18)
 
 Progress: [██████████] 100% (v1.0)
 
@@ -20,7 +20,7 @@ Progress: [██████████] 100% (v1.0)
 
 **v1.0 Summary:**
 - Total phases: 3
-- Total plans: 2 formal + 16 quick tasks
+- Total plans: 2 formal + 18 quick tasks
 - Requirements: 31/31 satisfied
 - LOC: 7,138 TypeScript
 - Tests: 192 passing
@@ -33,6 +33,7 @@ Progress: [██████████] 100% (v1.0)
 Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase quick]: Project parked with complete handoff document for scope-retention fix arc (quick-13 through quick-16)
 - [Phase quick-17]: PARKED_NOOP behavioral directive in CLAUDE.md for idle session response
+- [Phase quick-18]: Gateway startup fails: stale token (fixed in .env), WhisperX wsp.kingdom.lv unreachable (external)
 
 ### Pending Todos
 
@@ -40,8 +41,10 @@ None — v1.0 complete.
 
 ### Blockers/Concerns
 
-- OpenClaw WebSocket protocol details need validation against running instance
+- ~~OpenClaw WebSocket protocol details need validation against running instance~~ RESOLVED (quick-18): protocol handshake validated -- connect.challenge/connect/hello-ok works with correct token
 - Even Hub audio format (WebM/Opus vs CAF/AAC) needs confirmation for test fixtures
+- WhisperX at wsp.kingdom.lv is unreachable (Cloudflare-fronted origin timeout) -- gateway cannot fully start until STT service is restored or alternative configured
+- Shell env has stale OPENCLAW_GATEWAY_TOKEN export -- must unset or override when launching gateway
 
 ### Quick Tasks Completed
 
@@ -56,9 +59,10 @@ None — v1.0 complete.
 | 15 | Self-review: security audit 5/5 pass, client/server alignment verified, 223/223 tests green | 2026-03-01 | b76e547 | [15-self-review-last-commits-for-shared-secr](./quick/15-self-review-last-commits-for-shared-secr/) |
 | 16 | Final handoff: scope-retention fix commits, files, tests, security -- parked | 2026-03-01 | 79bf6b6 | [16-finalize-and-park-give-a-concise-final-h](./quick/16-finalize-and-park-give-a-concise-final-h/) |
 | 17 | Enter parked-idle mode: CLAUDE.md directive to respond PARKED_NOOP when no explicit task given | 2026-03-01 | ee84bfe | [17-enter-parked-idle-mode-when-resumed-with](./quick/17-enter-parked-idle-mode-when-resumed-with/) |
+| 18 | Investigate startup blocker: stale gateway token fixed, WhisperX unreachable (external) | 2026-03-01 | (docs only) | [18-investigate-and-resolve-startup-blocker](./quick/18-investigate-and-resolve-startup-blocker/) |
 
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Parked-idle mode active. CLAUDE.md governs resume behavior.
+Stopped at: Completed quick-18 startup blocker investigation. Gateway partially fixed (OpenClaw ok, WhisperX external blocker).
 Resume file: None
