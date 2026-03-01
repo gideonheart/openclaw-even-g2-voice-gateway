@@ -32,6 +32,7 @@ Progress: [██████████] 100% (v1.0)
 
 Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase quick]: Project parked with complete handoff document for scope-retention fix arc (quick-13 through quick-16)
+- [Phase quick-17]: PARKED_NOOP behavioral directive in CLAUDE.md for idle session response
 
 ### Pending Todos
 
