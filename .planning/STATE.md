@@ -31,6 +31,7 @@ Progress: [██████████] 100% (v1.0)
 ### Decisions
 
 Decisions are logged in PROJECT.md Key Decisions table.
+- [Phase quick]: Project parked with complete handoff document for scope-retention fix arc (quick-13 through quick-16)
 
 ### Pending Todos
 
