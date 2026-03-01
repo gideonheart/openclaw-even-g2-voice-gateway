@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
 Status: PARKED-IDLE -- responds only to explicit engineering tasks
-Last activity: 2026-03-01 - Investigated startup blocker (quick-18)
+Last activity: 2026-03-01 - Documented gateway connection architecture (quick-19)
 
 Progress: [██████████] 100% (v1.0)
 
@@ -20,7 +20,7 @@ Progress: [██████████] 100% (v1.0)
 
 **v1.0 Summary:**
 - Total phases: 3
-- Total plans: 2 formal + 18 quick tasks
+- Total plans: 2 formal + 19 quick tasks
 - Requirements: 31/31 satisfied
 - LOC: 7,138 TypeScript
 - Tests: 192 passing
@@ -34,6 +34,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase quick]: Project parked with complete handoff document for scope-retention fix arc (quick-13 through quick-16)
 - [Phase quick-17]: PARKED_NOOP behavioral directive in CLAUDE.md for idle session response
 - [Phase quick-18]: Gateway startup fails: stale token (fixed in .env), WhisperX wsp.kingdom.lv unreachable (external)
+- [Phase quick-19]: Documented connection architecture: PORT=4400 inbound vs OPENCLAW_GATEWAY_URL outbound, ASCII flow diagrams, remote access guidance
 
 ### Pending Todos
 
@@ -60,9 +61,10 @@ None — v1.0 complete.
 | 16 | Final handoff: scope-retention fix commits, files, tests, security -- parked | 2026-03-01 | 79bf6b6 | [16-finalize-and-park-give-a-concise-final-h](./quick/16-finalize-and-park-give-a-concise-final-h/) |
 | 17 | Enter parked-idle mode: CLAUDE.md directive to respond PARKED_NOOP when no explicit task given | 2026-03-01 | ee84bfe | [17-enter-parked-idle-mode-when-resumed-with](./quick/17-enter-parked-idle-mode-when-resumed-with/) |
 | 18 | Investigate startup blocker: stale gateway token fixed, WhisperX unreachable (external) | 2026-03-01 | 3654d92 | [18-investigate-and-resolve-startup-blocker](./quick/18-investigate-and-resolve-startup-blocker/) |
+| 19 | Document gateway connection architecture, port/URL distinction, remote access | 2026-03-01 | 433fb84 | [19-document-gateway-architecture-and-connec](./quick/19-document-gateway-architecture-and-connec/) |
 
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed quick-18 startup blocker investigation. Gateway partially fixed (OpenClaw ok, WhisperX external blocker).
+Stopped at: Completed quick-19 documentation of gateway connection architecture.
 Resume file: None
