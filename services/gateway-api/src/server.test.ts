@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { RateLimiter } from "./server.js";
+import http from "node:http";
+import { RateLimiter, createGatewayServer, type ServerDeps } from "./server.js";
 import { ConfigStore } from "./config-store.js";
 import { createProviderId, createSessionKey } from "@voice-gateway/shared-types";
 import type { GatewayConfig } from "@voice-gateway/shared-types";
+import { Logger } from "@voice-gateway/logging";
 
 /** Minimal valid GatewayConfig fixture. */
 function makeTestConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
@@ -37,6 +39,7 @@ function makeTestConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
       port: 4400,
       host: "0.0.0.0",
       corsOrigins: [],
+      allowNullOrigin: false,
       maxAudioBytes: 25 * 1024 * 1024,
       rateLimitPerMinute: 60,
     },
@@ -51,7 +54,7 @@ describe("RateLimiter", () => {
   beforeEach(() => {
     vi.useFakeTimers();
     configStore = new ConfigStore(
-      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 60 } }),
+      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], allowNullOrigin: false, maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 60 } }),
     );
     rateLimiter = new RateLimiter(configStore);
   });
@@ -63,7 +66,7 @@ describe("RateLimiter", () => {
 
   it("allows requests within rate limit", () => {
     const store = new ConfigStore(
-      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 5 } }),
+      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], allowNullOrigin: false, maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 5 } }),
     );
     const limiter = new RateLimiter(store);
 
@@ -78,7 +81,7 @@ describe("RateLimiter", () => {
 
   it("rejects requests exceeding rate limit", () => {
     const store = new ConfigStore(
-      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 3 } }),
+      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], allowNullOrigin: false, maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 3 } }),
     );
     const limiter = new RateLimiter(store);
 
@@ -93,7 +96,7 @@ describe("RateLimiter", () => {
 
   it("tracks IPs independently", () => {
     const store = new ConfigStore(
-      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 2 } }),
+      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], allowNullOrigin: false, maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 2 } }),
     );
     const limiter = new RateLimiter(store);
 
@@ -112,7 +115,7 @@ describe("RateLimiter", () => {
 
   it("reacts to config change for rateLimitPerMinute", () => {
     const store = new ConfigStore(
-      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 2 } }),
+      makeTestConfig({ server: { port: 4400, host: "0.0.0.0", corsOrigins: [], allowNullOrigin: false, maxAudioBytes: 25 * 1024 * 1024, rateLimitPerMinute: 2 } }),
     );
     const limiter = new RateLimiter(store);
 
@@ -184,5 +187,203 @@ describe("RateLimiter", () => {
     // After prune, only the batch2 entries remain
     expect(rateLimiter.check("ip-batch1-0")).toBe(true); // fresh window (was pruned)
     expect(rateLimiter.check("ip-batch1-1")).toBe(true); // fresh window (was pruned)
+  });
+});
+
+// ── CORS Tests ──
+
+/** Helper: make a request to the test server and return status + headers. */
+function request(
+  port: number,
+  method: string,
+  path: string,
+  headers: Record<string, string> = {},
+): Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }> {
+  return new Promise((resolve, reject) => {
+    const req = http.request(
+      { hostname: "127.0.0.1", port, method, path, headers },
+      (res) => {
+        const chunks: Buffer[] = [];
+        res.on("data", (chunk: Buffer) => chunks.push(chunk));
+        res.on("end", () => {
+          resolve({
+            status: res.statusCode ?? 0,
+            headers: res.headers,
+            body: Buffer.concat(chunks).toString("utf-8"),
+          });
+        });
+      },
+    );
+    req.on("error", reject);
+    req.end();
+  });
+}
+
+/** Create test deps with configurable CORS settings. */
+function makeCorsTestDeps(opts: {
+  corsOrigins: string[];
+  allowNullOrigin: boolean;
+}): ServerDeps {
+  const config = makeTestConfig({
+    server: {
+      port: 0,
+      host: "127.0.0.1",
+      corsOrigins: opts.corsOrigins,
+      allowNullOrigin: opts.allowNullOrigin,
+      maxAudioBytes: 1024 * 1024,
+      rateLimitPerMinute: 60,
+    },
+  });
+  return {
+    configStore: new ConfigStore(config),
+    sttProviders: new Map(),
+    openclawClient: {
+      healthCheck: async () => ({ healthy: true, message: "ok", latencyMs: 1 }),
+      connect: async () => {},
+      close: async () => {},
+      sendChat: async () => ({ type: "chat", text: "", done: true }),
+    } as any,
+    logger: new Logger(),
+    ready: true,
+  };
+}
+
+describe("handleCors", () => {
+  let server: http.Server;
+  let port: number;
+
+  afterEach(() => {
+    return new Promise<void>((resolve) => {
+      if (server?.listening) {
+        server.close(() => resolve());
+      } else {
+        resolve();
+      }
+    });
+  });
+
+  async function startServer(deps: ServerDeps): Promise<void> {
+    server = createGatewayServer(deps);
+    await new Promise<void>((resolve) => {
+      server.listen(0, "127.0.0.1", () => {
+        const addr = server.address();
+        port = typeof addr === "object" && addr ? addr.port : 0;
+        resolve();
+      });
+    });
+  }
+
+  it("allowed origin gets CORS headers", async () => {
+    await startServer(
+      makeCorsTestDeps({
+        corsOrigins: ["http://localhost:3001"],
+        allowNullOrigin: false,
+      }),
+    );
+
+    const res = await request(port, "GET", "/healthz", {
+      Origin: "http://localhost:3001",
+    });
+
+    expect(res.status).toBe(200);
+    expect(res.headers["access-control-allow-origin"]).toBe(
+      "http://localhost:3001",
+    );
+  });
+
+  it("disallowed origin gets 403", async () => {
+    await startServer(
+      makeCorsTestDeps({
+        corsOrigins: ["http://localhost:3001"],
+        allowNullOrigin: false,
+      }),
+    );
+
+    const res = await request(port, "GET", "/healthz", {
+      Origin: "http://evil.example.com",
+    });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toContain("CORS_REJECTED");
+  });
+
+  it("null origin allowed when allowNullOrigin=true", async () => {
+    await startServer(
+      makeCorsTestDeps({
+        corsOrigins: ["http://localhost:3001"],
+        allowNullOrigin: true,
+      }),
+    );
+
+    const res = await request(port, "GET", "/healthz", { Origin: "null" });
+
+    expect(res.status).not.toBe(403);
+    expect(res.headers["access-control-allow-origin"]).toBe("null");
+  });
+
+  it("null origin rejected when allowNullOrigin=false", async () => {
+    await startServer(
+      makeCorsTestDeps({
+        corsOrigins: ["http://localhost:3001"],
+        allowNullOrigin: false,
+      }),
+    );
+
+    const res = await request(port, "GET", "/healthz", { Origin: "null" });
+
+    expect(res.status).toBe(403);
+    expect(res.body).toContain("CORS_REJECTED");
+  });
+
+  it("no origin header (server-to-server) passes through", async () => {
+    await startServer(
+      makeCorsTestDeps({
+        corsOrigins: ["http://localhost:3001"],
+        allowNullOrigin: false,
+      }),
+    );
+
+    const res = await request(port, "GET", "/healthz");
+
+    expect(res.status).toBe(200);
+    expect(res.headers["access-control-allow-origin"]).toBeUndefined();
+  });
+
+  it("preflight OPTIONS with allowed origin returns 204", async () => {
+    await startServer(
+      makeCorsTestDeps({
+        corsOrigins: ["http://localhost:3001"],
+        allowNullOrigin: false,
+      }),
+    );
+
+    const res = await request(port, "OPTIONS", "/healthz", {
+      Origin: "http://localhost:3001",
+      "Access-Control-Request-Method": "POST",
+    });
+
+    expect(res.status).toBe(204);
+    expect(res.headers["access-control-allow-origin"]).toBe(
+      "http://localhost:3001",
+    );
+    expect(res.headers["access-control-allow-methods"]).toContain("POST");
+  });
+
+  it("preflight OPTIONS with null origin + allowNullOrigin=true returns 204", async () => {
+    await startServer(
+      makeCorsTestDeps({
+        corsOrigins: ["http://localhost:3001"],
+        allowNullOrigin: true,
+      }),
+    );
+
+    const res = await request(port, "OPTIONS", "/healthz", {
+      Origin: "null",
+      "Access-Control-Request-Method": "POST",
+    });
+
+    expect(res.status).toBe(204);
+    expect(res.headers["access-control-allow-origin"]).toBe("null");
+    expect(res.headers["access-control-allow-methods"]).toContain("POST");
   });
 });

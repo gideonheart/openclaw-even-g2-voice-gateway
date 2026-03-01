@@ -94,6 +94,21 @@ describe("loadConfig", () => {
     }
   });
 
+  it("CORS_ALLOW_NULL_ORIGIN=true sets allowNullOrigin to true", () => {
+    const config = loadConfig({ CORS_ALLOW_NULL_ORIGIN: "true" });
+    expect(config.server.allowNullOrigin).toBe(true);
+  });
+
+  it("CORS_ALLOW_NULL_ORIGIN not set defaults to false", () => {
+    const config = loadConfig({});
+    expect(config.server.allowNullOrigin).toBe(false);
+  });
+
+  it("CORS_ALLOW_NULL_ORIGIN=false sets allowNullOrigin to false", () => {
+    const config = loadConfig({ CORS_ALLOW_NULL_ORIGIN: "false" });
+    expect(config.server.allowNullOrigin).toBe(false);
+  });
+
   it("throws on non-numeric WHISPERX_POLL_INTERVAL_MS", () => {
     expect(() =>
       loadConfig({ WHISPERX_POLL_INTERVAL_MS: "not-a-number" }),

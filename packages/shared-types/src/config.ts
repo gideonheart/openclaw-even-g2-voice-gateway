@@ -55,6 +55,7 @@ export interface ServerConfig {
   readonly port: number;
   readonly host: string;
   readonly corsOrigins: readonly string[];
+  readonly allowNullOrigin: boolean;
   readonly maxAudioBytes: number;
   readonly rateLimitPerMinute: number;
 }

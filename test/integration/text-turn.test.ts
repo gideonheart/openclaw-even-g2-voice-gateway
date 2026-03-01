@@ -1,9 +1,11 @@
 /**
- * End-to-end integration test: Audio -> STT -> OpenClaw -> GatewayReply
+ * End-to-end integration test: Text -> OpenClaw -> GatewayReply
  *
- * Uses mocked STT provider and mock OpenClaw gateway server (with proper
- * protocol: connect.challenge -> connect -> hello-ok -> chat.send -> chat event)
- * to verify the complete pipeline without external dependencies.
+ * Uses mock OpenClaw gateway server (with proper protocol:
+ * connect.challenge -> connect -> hello-ok -> chat.send -> chat event)
+ * to verify the text turn pipeline without external dependencies.
+ *
+ * Text turns skip STT entirely and send user text directly to OpenClaw.
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
@@ -30,7 +32,7 @@ function makeConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
     whisperx: { baseUrl: "", model: "medium", language: "en", pollIntervalMs: 100, timeoutMs: 5000 },
     openai: { apiKey: "", model: "whisper-1", language: "en" },
     customHttp: { url: "", authHeader: "", requestMapping: {}, responseMapping: { textField: "text", languageField: "language", confidenceField: "confidence" } },
-    server: { port: 0, host: "127.0.0.1", corsOrigins: ["http://localhost:3001"], allowNullOrigin: false, maxAudioBytes: 1024 * 1024, rateLimitPerMinute: 60 },
+    server: { port: 0, host: "127.0.0.1", corsOrigins: [], allowNullOrigin: false, maxAudioBytes: 1024 * 1024, rateLimitPerMinute: 60 },
     ...overrides,
   };
 }
@@ -46,11 +48,10 @@ function attachOpenClawProtocol(
   wsServer.on("connection", (ws) => {
     let authenticated = false;
 
-    // Step 1: Send connect.challenge
     ws.send(JSON.stringify({
       type: "event",
       event: "connect.challenge",
-      payload: { nonce: "integration-test-nonce" },
+      payload: { nonce: "text-turn-test-nonce" },
     }));
 
     ws.on("message", (data) => {
@@ -61,16 +62,14 @@ function attachOpenClawProtocol(
         params?: Record<string, unknown>;
       };
 
-      // Validate frame structure
       if (frame.type !== "req" || !frame.id || !frame.method) {
         ws.close(1008, "invalid request frame");
         return;
       }
 
       if (!authenticated) {
-        // Must be connect handshake
         if (frame.method !== "connect") {
-          ws.close(1008, "invalid handshake: first request must be connect");
+          ws.close(1008, "invalid handshake");
           return;
         }
 
@@ -82,7 +81,7 @@ function attachOpenClawProtocol(
           payload: {
             type: "hello-ok",
             protocol: 3,
-            server: { version: "test", connId: "integration-conn-1" },
+            server: { version: "test", connId: "text-turn-conn-1" },
             features: { methods: ["chat.send"], events: ["chat"] },
             snapshot: { presence: [], stateVersion: { presence: 0, health: 0 } },
             policy: { maxPayload: 1048576, maxBufferedBytes: 4194304, tickIntervalMs: 30000 },
@@ -91,7 +90,6 @@ function attachOpenClawProtocol(
         return;
       }
 
-      // Handle chat.send
       if (frame.method === "chat.send") {
         const params = frame.params as {
           sessionKey: string;
@@ -99,7 +97,6 @@ function attachOpenClawProtocol(
           idempotencyKey: string;
         };
 
-        // Send ack
         ws.send(JSON.stringify({
           type: "res",
           id: frame.id,
@@ -107,7 +104,6 @@ function attachOpenClawProtocol(
           payload: { runId: params.idempotencyKey, status: "started" },
         }));
 
-        // Send final chat event with response
         const responseText = responseBuilder(params.message);
         setTimeout(() => {
           ws.send(JSON.stringify({
@@ -131,7 +127,7 @@ function attachOpenClawProtocol(
   });
 }
 
-describe("Voice Turn Integration", () => {
+describe("Text Turn Integration", () => {
   let wsServer: WebSocketServer;
   let wsPort: number;
   let httpServer: http.Server;
@@ -142,7 +138,6 @@ describe("Voice Turn Integration", () => {
     vi.spyOn(process.stdout, "write").mockReturnValue(true);
     vi.spyOn(process.stderr, "write").mockReturnValue(true);
 
-    // Start mock OpenClaw WebSocket server with proper protocol
     wsServer = new WebSocketServer({ port: 0 });
     const wsAddr = wsServer.address();
     wsPort = typeof wsAddr === "object" && wsAddr !== null ? wsAddr.port : 0;
@@ -154,31 +149,8 @@ describe("Voice Turn Integration", () => {
     vi.restoreAllMocks();
   });
 
-  it("complete voice turn: audio -> STT -> OpenClaw -> shaped response", async () => {
-    // Attach OpenClaw protocol handler
-    attachOpenClawProtocol(wsServer, (msg) => `AI response to: ${msg}`);
-
-    // Mock STT provider
-    const mockProvider: SttProvider = {
-      providerId: ProviderIds.WhisperX,
-      name: "Mock WhisperX",
-      transcribe: vi.fn().mockResolvedValue({
-        text: "What is the weather today",
-        language: "en",
-        confidence: null,
-        providerId: ProviderIds.WhisperX,
-        model: "medium",
-        durationMs: 200,
-      }),
-      healthCheck: vi.fn().mockResolvedValue({
-        healthy: true,
-        message: "ok",
-        latencyMs: 5,
-      }),
-    };
-
-    const providers = new Map<string, SttProvider>();
-    providers.set(ProviderIds.WhisperX, mockProvider);
+  it("complete text turn: text -> OpenClaw -> shaped response (no STT)", async () => {
+    attachOpenClawProtocol(wsServer, (msg) => `AI says: ${msg}`);
 
     const openclawClient = new OpenClawClient(
       {
@@ -197,27 +169,24 @@ describe("Voice Turn Integration", () => {
 
     httpServer = createGatewayServer({
       configStore: new ConfigStore(config),
-      sttProviders: providers,
+      sttProviders: new Map(),
       openclawClient,
       logger,
       ready: true,
     });
 
-    // Start HTTP server
     await new Promise<void>((resolve) => {
       httpServer.listen(0, "127.0.0.1", resolve);
     });
     const httpAddr = httpServer.address();
-    httpPort =
-      typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
+    httpPort = typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
 
-    // Send voice turn request
     const response = await fetch(
-      `http://127.0.0.1:${httpPort}/api/voice/turn`,
+      `http://127.0.0.1:${httpPort}/api/text/turn`,
       {
         method: "POST",
-        headers: { "Content-Type": "audio/wav" },
-        body: Buffer.from("fake-wav-audio-data"),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "Hello from typed chat" }),
       },
     );
 
@@ -228,26 +197,23 @@ describe("Voice Turn Integration", () => {
     // Verify response structure
     expect(reply.turnId).toBeDefined();
     expect(reply.sessionKey).toBe("test-session");
-    expect(reply.assistant.fullText).toBe(
-      "AI response to: What is the weather today",
-    );
+    expect(reply.assistant.fullText).toBe("AI says: Hello from typed chat");
     expect(reply.assistant.segments.length).toBeGreaterThan(0);
-    expect(reply.assistant.segments[0]?.text).toBe(
-      "AI response to: What is the weather today",
-    );
-    expect(reply.timing.sttMs).toBeGreaterThanOrEqual(0);
+    expect(reply.assistant.segments[0]?.text).toBe("AI says: Hello from typed chat");
+
+    // STT was not used -- sttMs must be 0
+    expect(reply.timing.sttMs).toBe(0);
     expect(reply.timing.agentMs).toBeGreaterThanOrEqual(0);
     expect(reply.timing.totalMs).toBeGreaterThanOrEqual(0);
-    expect(reply.meta.provider).toBe("whisperx");
-    expect(reply.meta.model).toBe("medium");
 
-    // Verify STT was called with audio
-    expect(mockProvider.transcribe).toHaveBeenCalledOnce();
+    // Provider should be "text" for text turns
+    expect(reply.meta.provider).toBe("text");
+    expect(reply.meta.model).toBeNull();
 
     openclawClient.disconnect();
   });
 
-  it("healthz returns 200", async () => {
+  it("rejects non-JSON content type", async () => {
     const config = makeConfig();
     httpServer = createGatewayServer({
       configStore: new ConfigStore(config),
@@ -261,47 +227,24 @@ describe("Voice Turn Integration", () => {
       httpServer.listen(0, "127.0.0.1", resolve);
     });
     const httpAddr = httpServer.address();
-    httpPort =
-      typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
-
-    const response = await fetch(`http://127.0.0.1:${httpPort}/healthz`);
-    expect(response.status).toBe(200);
-    const body = (await response.json()) as { status: string };
-    expect(body.status).toBe("ok");
-  });
-
-  it("rejects unsupported content type", async () => {
-    const config = makeConfig();
-    httpServer = createGatewayServer({
-      configStore: new ConfigStore(config),
-      sttProviders: new Map(),
-      openclawClient: new OpenClawClient({}, logger),
-      logger,
-      ready: true,
-    });
-
-    await new Promise<void>((resolve) => {
-      httpServer.listen(0, "127.0.0.1", resolve);
-    });
-    const httpAddr = httpServer.address();
-    httpPort =
-      typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
+    httpPort = typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
 
     const response = await fetch(
-      `http://127.0.0.1:${httpPort}/api/voice/turn`,
+      `http://127.0.0.1:${httpPort}/api/text/turn`,
       {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
-        body: "not audio",
+        body: "not json",
       },
     );
 
     expect(response.status).toBe(400);
-    const body = (await response.json()) as { code: string };
+    const body = (await response.json()) as { code: string; error: string };
     expect(body.code).toBe("INVALID_CONTENT_TYPE");
+    expect(body.error).toContain("application/json");
   });
 
-  it("returns 404 for unknown routes", async () => {
+  it("rejects empty text", async () => {
     const config = makeConfig();
     httpServer = createGatewayServer({
       configStore: new ConfigStore(config),
@@ -315,14 +258,81 @@ describe("Voice Turn Integration", () => {
       httpServer.listen(0, "127.0.0.1", resolve);
     });
     const httpAddr = httpServer.address();
-    httpPort =
-      typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
+    httpPort = typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
 
-    const response = await fetch(`http://127.0.0.1:${httpPort}/nope`);
-    expect(response.status).toBe(404);
+    const response = await fetch(
+      `http://127.0.0.1:${httpPort}/api/text/turn`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ text: "   " }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { code: string; error: string };
+    expect(body.error).toContain("empty");
   });
 
-  it("returns 429 when rate limit exceeded", async () => {
+  it("rejects missing text field", async () => {
+    const config = makeConfig();
+    httpServer = createGatewayServer({
+      configStore: new ConfigStore(config),
+      sttProviders: new Map(),
+      openclawClient: new OpenClawClient({}, logger),
+      logger,
+      ready: true,
+    });
+
+    await new Promise<void>((resolve) => {
+      httpServer.listen(0, "127.0.0.1", resolve);
+    });
+    const httpAddr = httpServer.address();
+    httpPort = typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
+
+    const response = await fetch(
+      `http://127.0.0.1:${httpPort}/api/text/turn`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: "wrong field name" }),
+      },
+    );
+
+    expect(response.status).toBe(400);
+    const body = (await response.json()) as { code: string; error: string };
+    expect(body.error).toContain("text");
+  });
+
+  it("rejects invalid JSON body", async () => {
+    const config = makeConfig();
+    httpServer = createGatewayServer({
+      configStore: new ConfigStore(config),
+      sttProviders: new Map(),
+      openclawClient: new OpenClawClient({}, logger),
+      logger,
+      ready: true,
+    });
+
+    await new Promise<void>((resolve) => {
+      httpServer.listen(0, "127.0.0.1", resolve);
+    });
+    const httpAddr = httpServer.address();
+    httpPort = typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
+
+    const response = await fetch(
+      `http://127.0.0.1:${httpPort}/api/text/turn`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "not valid json {{{",
+      },
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it("rate-limits text turn endpoint", async () => {
     const config = makeConfig({
       server: {
         ...makeConfig().server,
@@ -342,27 +352,28 @@ describe("Voice Turn Integration", () => {
       httpServer.listen(0, "127.0.0.1", resolve);
     });
     const httpAddr = httpServer.address();
-    httpPort =
-      typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
+    httpPort = typeof httpAddr === "object" && httpAddr !== null ? httpAddr.port : 0;
 
+    // Use requests that fail fast at validation (missing text field)
+    // so they don't hang waiting for OpenClaw.
+    // Rate limiter still counts them since it runs before the handler.
     const sendRequest = (): Promise<Response> =>
-      fetch(`http://127.0.0.1:${httpPort}/api/voice/turn`, {
+      fetch(`http://127.0.0.1:${httpPort}/api/text/turn`, {
         method: "POST",
-        headers: { "Content-Type": "audio/wav" },
-        body: Buffer.from("fake-audio"),
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ noTextField: true }),
       });
 
-    // First 2 requests go through (they will fail with provider error, but not 429)
-    const response1 = await sendRequest();
-    const response2 = await sendRequest();
-    expect(response1.status).not.toBe(429);
-    expect(response2.status).not.toBe(429);
+    // First 2 go through rate limiter (fail at validation with 400, not 429)
+    const r1 = await sendRequest();
+    const r2 = await sendRequest();
+    expect(r1.status).toBe(400);
+    expect(r2.status).toBe(400);
 
-    // Third request should be rate limited
-    const response3 = await sendRequest();
-    expect(response3.status).toBe(429);
-    const body = (await response3.json()) as { error: string; code: string };
+    // Third should be rate limited
+    const r3 = await sendRequest();
+    expect(r3.status).toBe(429);
+    const body = (await r3.json()) as { code: string };
     expect(body.code).toBe("RATE_LIMITED");
-    expect(body.error).toBe("Too many requests. Please wait.");
   });
 });

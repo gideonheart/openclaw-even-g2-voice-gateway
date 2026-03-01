@@ -3,6 +3,7 @@
  *
  * Endpoints:
  * - POST /api/voice/turn — execute a voice turn (audio → response)
+ * - POST /api/text/turn  — execute a text turn (text → response, skips STT)
  * - POST /api/settings — update runtime configuration
  * - GET  /api/settings — get safe config (secrets masked)
  * - GET  /healthz — liveness check
@@ -29,7 +30,7 @@ import {
 import type { SttProvider } from "@voice-gateway/stt-contract";
 import type { OpenClawClient } from "@voice-gateway/openclaw-client";
 import { validateAudioContentType, validateAudioSize } from "@voice-gateway/validation";
-import { executeVoiceTurn } from "./orchestrator.js";
+import { executeVoiceTurn, executeTextTurn } from "./orchestrator.js";
 import type { Logger } from "@voice-gateway/logging";
 import { ConfigStore, validateSettingsPatch } from "./config-store.js";
 
@@ -109,7 +110,8 @@ export function createGatewayServer(deps: ServerDeps): Server {
       }
 
       // CORS handling (SAFE-07: strict rejection for non-allowlisted origins)
-      if (handleCors(req, res, deps.configStore.get().server.corsOrigins)) return;
+      const serverCfg = deps.configStore.get().server;
+      if (handleCors(req, res, serverCfg.corsOrigins, serverCfg.allowNullOrigin)) return;
 
       const url = req.url ?? "";
       const method = req.method ?? "GET";
@@ -123,6 +125,14 @@ export function createGatewayServer(deps: ServerDeps): Server {
           return;
         }
         await handleVoiceTurn(req, res, deps, turnId, requestLog);
+      } else if (method === "POST" && url === "/api/text/turn") {
+        // Rate limit the text turn endpoint
+        const clientIp = req.socket.remoteAddress ?? "unknown";
+        if (!rateLimiter.check(clientIp)) {
+          sendJson(res, 429, { error: "Too many requests. Please wait.", code: ErrorCodes.RATE_LIMITED });
+          return;
+        }
+        await handleTextTurn(req, res, deps, turnId, requestLog);
       } else if (method === "POST" && url === "/api/settings") {
         // SAFE-06: Rate-limit the settings endpoint
         const clientIp = req.socket.remoteAddress ?? "unknown";
@@ -188,6 +198,79 @@ async function handleVoiceTurn(
     {
       sttProviders: deps.sttProviders,
       activeProviderId: config.sttProvider,
+      openclawClient: deps.openclawClient,
+      logger: deps.logger,
+    },
+  );
+
+  sendJson(res, 200, result.reply);
+}
+
+/** Maximum body size for text turn requests (64KB). */
+const MAX_TEXT_BODY_BYTES = 64 * 1024;
+
+/**
+ * POST /api/text/turn — execute a text turn (skips STT).
+ *
+ * Accepts JSON body: { "text": "user message" }
+ * Returns GatewayReply (same envelope as voice turns, with sttMs = 0).
+ */
+async function handleTextTurn(
+  req: IncomingMessage,
+  res: ServerResponse,
+  deps: ServerDeps,
+  turnId: ReturnType<typeof createTurnId>,
+  log: Logger,
+): Promise<void> {
+  const config = deps.configStore.get();
+
+  // Validate content type
+  const ct = req.headers["content-type"];
+  if (!ct || !ct.startsWith("application/json")) {
+    throw new UserError(
+      ErrorCodes.INVALID_CONTENT_TYPE,
+      "Content-Type must be application/json",
+    );
+  }
+
+  // Read body (64KB max for text)
+  const body = await readBody(req, MAX_TEXT_BODY_BYTES);
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(body.toString("utf-8"));
+  } catch {
+    throw new UserError(ErrorCodes.INVALID_CONFIG, "Request body is not valid JSON");
+  }
+
+  // Validate payload shape
+  if (
+    typeof parsed !== "object" ||
+    parsed === null ||
+    typeof (parsed as Record<string, unknown>)["text"] !== "string"
+  ) {
+    throw new UserError(
+      ErrorCodes.INVALID_CONFIG,
+      'Request body must contain a "text" field (string)',
+    );
+  }
+
+  const text = ((parsed as Record<string, unknown>)["text"] as string).trim();
+  if (text.length === 0) {
+    throw new UserError(ErrorCodes.INVALID_CONFIG, "Text must not be empty");
+  }
+
+  log.info("Text turn request received", {
+    textLength: text.length,
+  });
+
+  const result = await executeTextTurn(
+    {
+      turnId,
+      sessionKey: config.openclawSessionKey,
+      text,
+    },
+    {
       openclawClient: deps.openclawClient,
       logger: deps.logger,
     },
@@ -281,8 +364,27 @@ function handleCors(
   req: IncomingMessage,
   res: ServerResponse,
   allowedOrigins: readonly string[],
+  allowNullOrigin: boolean,
 ): boolean {
   const origin = req.headers["origin"];
+
+  // WebView/file:// origins send the literal string "null" per RFC 6454.
+  // When allowNullOrigin is true, treat this as a permitted origin.
+  if (origin === "null" && allowNullOrigin) {
+    res.setHeader("Access-Control-Allow-Origin", "null");
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    res.setHeader(
+      "Access-Control-Allow-Headers",
+      "Content-Type, Authorization, X-Language-Hint, X-Session-Key",
+    );
+    res.setHeader("Access-Control-Max-Age", "86400");
+    if (req.method === "OPTIONS") {
+      res.writeHead(204);
+      res.end();
+      return true;
+    }
+    return false;
+  }
 
   if (allowedOrigins.length > 0) {
     // Strict mode: only allowlisted origins pass
@@ -292,7 +394,7 @@ function handleCors(
       res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
       res.setHeader(
         "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, X-Language-Hint",
+        "Content-Type, Authorization, X-Language-Hint, X-Session-Key",
       );
       res.setHeader("Access-Control-Max-Age", "86400");
     } else if (origin) {
@@ -316,7 +418,7 @@ function handleCors(
     res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
     res.setHeader(
       "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Language-Hint",
+      "Content-Type, Authorization, X-Language-Hint, X-Session-Key",
     );
     res.setHeader("Access-Control-Max-Age", "86400");
   }

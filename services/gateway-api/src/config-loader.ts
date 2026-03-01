@@ -89,6 +89,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
         .split(",")
         .map((s) => s.trim())
         .filter((s) => s.length > 0),
+      allowNullOrigin: (env["CORS_ALLOW_NULL_ORIGIN"] ?? "").toLowerCase() === "true",
       maxAudioBytes: safeParsePositiveInt(
         env["MAX_AUDIO_BYTES"],
         25 * 1024 * 1024,

@@ -36,6 +36,7 @@ function makeTestConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
       port: 4400,
       host: "0.0.0.0",
       corsOrigins: [],
+      allowNullOrigin: false,
       maxAudioBytes: 25 * 1024 * 1024,
       rateLimitPerMinute: 60,
     },

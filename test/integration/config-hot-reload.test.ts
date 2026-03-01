@@ -35,7 +35,7 @@ function makeConfig(overrides: Partial<GatewayConfig> = {}): GatewayConfig {
     whisperx: { baseUrl: "", model: "medium", language: "en", pollIntervalMs: 100, timeoutMs: 5000 },
     openai: { apiKey: "", model: "whisper-1", language: "en" },
     customHttp: { url: "", authHeader: "", requestMapping: {}, responseMapping: { textField: "text", languageField: "language", confidenceField: "confidence" } },
-    server: { port: 0, host: "127.0.0.1", corsOrigins: [], maxAudioBytes: 1024 * 1024, rateLimitPerMinute: 60 },
+    server: { port: 0, host: "127.0.0.1", corsOrigins: [], allowNullOrigin: false, maxAudioBytes: 1024 * 1024, rateLimitPerMinute: 60 },
     ...overrides,
   };
 }
