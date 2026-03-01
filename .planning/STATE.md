@@ -35,6 +35,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase quick-17]: PARKED_NOOP behavioral directive in CLAUDE.md for idle session response
 - [Phase quick-18]: Gateway startup fails: stale token (fixed in .env), WhisperX wsp.kingdom.lv unreachable (external)
 - [Phase quick-19]: Documented connection architecture: PORT=4400 inbound vs OPENCLAW_GATEWAY_URL outbound, ASCII flow diagrams, remote access guidance
+- [Phase quick-20]: CLAUDE.md parked-idle directive confirmed intact -- project re-enters PARKED-IDLE after quick-19 architecture docs
 
 ### Pending Todos
 
@@ -62,7 +63,7 @@ None — v1.0 complete.
 | 17 | Enter parked-idle mode: CLAUDE.md directive to respond PARKED_NOOP when no explicit task given | 2026-03-01 | ee84bfe | [17-enter-parked-idle-mode-when-resumed-with](./quick/17-enter-parked-idle-mode-when-resumed-with/) |
 | 18 | Investigate startup blocker: stale gateway token fixed, WhisperX unreachable (external) | 2026-03-01 | 3654d92 | [18-investigate-and-resolve-startup-blocker](./quick/18-investigate-and-resolve-startup-blocker/) |
 | 19 | Document gateway connection architecture, port/URL distinction, remote access | 2026-03-01 | 433fb84 | [19-document-gateway-architecture-and-connec](./quick/19-document-gateway-architecture-and-connec/) |
-| 20 | Re-enter parked-idle mode after quick-19 verification | 2026-03-01 | TBD | [20-enter-parked-idle-mode-again-after-quick](./quick/20-enter-parked-idle-mode-again-after-quick/) |
+| 20 | Re-enter parked-idle mode after quick-19 verification | 2026-03-01 | 89faa4d | [20-enter-parked-idle-mode-again-after-quick](./quick/20-enter-parked-idle-mode-again-after-quick/) |
 
 ## Session Continuity
 
