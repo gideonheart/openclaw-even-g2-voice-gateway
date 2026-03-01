@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
 Status: PARKED-IDLE -- responds only to explicit engineering tasks
-Last activity: 2026-03-01 - Documented gateway connection architecture (quick-19)
+Last activity: 2026-03-01 - Re-entered parked-idle mode after quick-19 verification (quick-20)
 
 Progress: [██████████] 100% (v1.0)
 
@@ -20,7 +20,7 @@ Progress: [██████████] 100% (v1.0)
 
 **v1.0 Summary:**
 - Total phases: 3
-- Total plans: 2 formal + 19 quick tasks
+- Total plans: 2 formal + 20 quick tasks
 - Requirements: 31/31 satisfied
 - LOC: 7,138 TypeScript
 - Tests: 192 passing
@@ -62,9 +62,10 @@ None — v1.0 complete.
 | 17 | Enter parked-idle mode: CLAUDE.md directive to respond PARKED_NOOP when no explicit task given | 2026-03-01 | ee84bfe | [17-enter-parked-idle-mode-when-resumed-with](./quick/17-enter-parked-idle-mode-when-resumed-with/) |
 | 18 | Investigate startup blocker: stale gateway token fixed, WhisperX unreachable (external) | 2026-03-01 | 3654d92 | [18-investigate-and-resolve-startup-blocker](./quick/18-investigate-and-resolve-startup-blocker/) |
 | 19 | Document gateway connection architecture, port/URL distinction, remote access | 2026-03-01 | 433fb84 | [19-document-gateway-architecture-and-connec](./quick/19-document-gateway-architecture-and-connec/) |
+| 20 | Re-enter parked-idle mode after quick-19 verification | 2026-03-01 | TBD | [20-enter-parked-idle-mode-again-after-quick](./quick/20-enter-parked-idle-mode-again-after-quick/) |
 
 ## Session Continuity
 
 Last session: 2026-03-01
-Stopped at: Completed quick-19 documentation of gateway connection architecture.
+Stopped at: Re-entered parked-idle mode after quick-20.
 Resume file: None
