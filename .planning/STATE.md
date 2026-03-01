@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
 Status: Milestone v1.0 archived — ready for next milestone
-Last activity: 2026-02-28 - Completed quick task 12: Push 2fc85c5 to origin/master, voice-turn integration tests 5/5 passing, no live gateway instance detected.
+Last activity: 2026-03-01 - Completed quick task 14: Ground truth verification of scope fix (quick-13). Both commits (4d1fb3e9f scope guard, 801fa7fe8 tests) confirmed in /home/forge/openclaw. 31/31 auth e2e tests pass. Scope retention fix is COMPLETE.
 
 Progress: [██████████] 100% (v1.0)
 
@@ -49,9 +49,11 @@ None — v1.0 complete.
 | 10 | Push latest commit bda47bd to origin/master now, then report git status -sb and git log --oneline -3 to confirm sync. | 2026-02-28 | 6a3fe07 | [10-push-latest-commit-bda47bd-to-origin-mas](./quick/10-push-latest-commit-bda47bd-to-origin-mas/) |
 | 11 | Push 2 ahead commits (6a3fe07, 9b24709) to origin/master | 2026-02-28 | cc94ab4 | [11-repo-still-ahead-2-after-quick-10-docs-c](./quick/11-repo-still-ahead-2-after-quick-10-docs-c/) |
 | 12 | Push 2fc85c5 to origin/master, smoke check OGG voice-turn path | 2026-02-28 | 325eb4b | [12-push-commit-2fc85c5-to-origin-master-and](./quick/12-push-commit-2fc85c5-to-origin-master-and/) |
+| 13 | Fix OpenClaw shared-secret scope retention (!sharedAuthOk guard) | 2026-02-28 | 4d1fb3e (openclaw) | [13-ground-truth-check-confirm-scope-retenti](./quick/13-ground-truth-check-confirm-scope-retenti/) |
+| 14 | Ground truth verify scope fix: commits confirmed, 31/31 auth e2e tests pass | 2026-03-01 | 04ef11d | [14-ground-truth-check-confirm-scope-retenti](./quick/14-ground-truth-check-confirm-scope-retenti/) |
 
 ## Session Continuity
 
-Last session: 2026-02-28
-Stopped at: Completed quick-12: push 2fc85c5 to origin/master and smoke check OGG voice-turn
+Last session: 2026-03-01
+Stopped at: Completed quick-14: ground truth verification of scope retention fix — 31/31 auth e2e tests pass, quick-13 COMPLETE
 Resume file: None
