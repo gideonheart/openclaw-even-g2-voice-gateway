@@ -23,7 +23,7 @@ The `ConfigStore.getSafe()` method enforces this at the source — there is no p
 
 ### Structured Logging
 
-The `@voice-gateway/logging` package masks fields matching secret patterns before writing to stdout/stderr. Fields named `token`, `apiKey`, `authHeader`, `authorization`, and `password` are automatically replaced with `"[REDACTED]"`.
+The `@voice-gateway/logging` package masks fields matching secret patterns before writing to stdout/stderr. Fields named `token`, `apiKey`, `authHeader`, `authorization`, `password`, and others in the secret field set are automatically replaced with `"********"`.
 
 ### Environment Variables
 

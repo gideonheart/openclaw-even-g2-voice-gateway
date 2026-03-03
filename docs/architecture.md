@@ -97,6 +97,32 @@ Every voice turn follows this exact sequence:
    }
 ```
 
+## Text Turn Pipeline
+
+Text turns skip the STT step entirely:
+
+```
+1. HTTP POST /api/text/turn
+   ├── Readiness gate check (503 if not ready)
+   ├── CORS validation (403 if origin not allowed)
+   ├── Rate limit check (429 if exceeded)
+   ├── Read JSON body (with size limit)
+   └── Validate "text" field (non-empty string)
+
+2. Orchestrator (executeTextTurn)
+   ├── Send text to OpenClaw via WebSocket
+   ├── Receive assistant response
+   └── Shape response (segment, truncate, normalize)
+
+3. Return GatewayReply
+   {
+     turnId, sessionKey,
+     assistant: { fullText, segments[], truncated },
+     timing: { sttMs: 0, agentMs, totalMs },
+     meta: { provider: "text", model: null }
+   }
+```
+
 ## Key Design Decisions
 
 | Decision | Rationale |
@@ -134,6 +160,7 @@ shared-types ◄── stt-contract ◄── stt-whisperx
 | Method | Path | Purpose |
 |--------|------|---------|
 | POST | `/api/voice/turn` | Execute a voice turn (audio in, structured response out) |
+| POST | `/api/text/turn` | Execute a text turn (text in, structured response out, no STT) |
 | POST | `/api/settings` | Update runtime configuration |
 | GET | `/api/settings` | Get current config with secrets masked |
 | GET | `/healthz` | Liveness probe (always responds) |

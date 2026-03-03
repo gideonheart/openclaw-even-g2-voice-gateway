@@ -4,29 +4,30 @@
 
 | Action | Command |
 |--------|---------|
-| Install | `npm install` |
-| Build | `npm run build` |
-| Run tests | `npm test` |
-| Type-check | `npm run typecheck` |
-| Start server | `node services/gateway-api/dist/index.js` |
+| Install | `bun install` |
+| Build | `bun run build` |
+| Run tests | `bun test` |
+| Type-check | `bun run typecheck` |
+| Start server | `bun services/gateway-api/dist/index.js` |
 | Liveness check | `curl http://localhost:4400/healthz` |
 | Readiness check | `curl http://localhost:4400/readyz` |
 | Get config | `curl http://localhost:4400/api/settings` |
+| Voice turn | `curl -X POST http://localhost:4400/api/voice/turn -H "Content-Type: audio/wav" --data-binary @sample.wav` |
+| Text turn | `curl -X POST http://localhost:4400/api/text/turn -H "Content-Type: application/json" -d '{"text":"Hello"}'` |
 
 ## Prerequisites
 
-- Node.js >= 20.0.0
-- npm (comes with Node.js)
+- Bun (https://bun.sh)
 - A running OpenClaw gateway instance (WebSocket)
-- At least one STT provider accessible (WhisperX, OpenAI, or custom)
+- At least one STT provider accessible (WhisperX, OpenAI, or custom) for voice turns
 
 ## Installation
 
 ```bash
 git clone <repo-url>
 cd openclaw-even-g2-voice-gateway
-npm install
-npm run build
+bun install
+bun run build
 ```
 
 ## Configuration
@@ -41,10 +42,16 @@ cp .env.example .env
 
 | Variable | Description | Example |
 |----------|-------------|---------|
-| `OPENCLAW_GATEWAY_URL` | OpenClaw WebSocket URL | `ws://localhost:3000` |
+| `OPENCLAW_GATEWAY_URL` | OpenClaw WebSocket URL (explicit override) | `ws://localhost:3000` |
+| `OPENCLAW_GATEWAY_PORT` | OpenClaw port (derives `ws://127.0.0.1:{port}` when URL is unset; set by OpenClaw systemd) | `3434` |
 | `OPENCLAW_GATEWAY_TOKEN` | Auth token for OpenClaw | `your-token` |
 | `OPENCLAW_SESSION_KEY` | Target session key | `my-session` |
 | `STT_PROVIDER` | Active provider: `whisperx`, `openai`, or `custom` | `whisperx` |
+
+**OpenClaw URL resolution fallback chain** (first non-empty wins):
+1. `OPENCLAW_GATEWAY_URL` -- explicit operator override
+2. `OPENCLAW_GATEWAY_PORT` -- derives `ws://127.0.0.1:{port}` (set by OpenClaw systemd)
+3. `ws://localhost:3000` -- last-resort default
 
 ### Provider-Specific Variables
 
@@ -87,7 +94,7 @@ cp .env.example .env
 
 ```bash
 # With .env file loaded (using your preferred method)
-node services/gateway-api/dist/index.js
+bun services/gateway-api/dist/index.js
 ```
 
 The server will:
@@ -143,6 +150,31 @@ Response:
   "meta": {"provider": "whisperx", "model": null}
 }
 ```
+
+## Making a Text Turn
+
+```bash
+curl -X POST http://localhost:4400/api/text/turn \
+  -H "Content-Type: application/json" \
+  -d '{"text": "What is the weather like?"}'
+```
+
+Response:
+```json
+{
+  "turnId": "turn_abc456",
+  "sessionKey": "my-session",
+  "assistant": {
+    "fullText": "The AI response text...",
+    "segments": [{"index": 0, "text": "The AI response text...", "continuation": false}],
+    "truncated": false
+  },
+  "timing": {"sttMs": 0, "agentMs": 800, "totalMs": 810},
+  "meta": {"provider": "text", "model": null}
+}
+```
+
+Text turns skip the STT step entirely -- useful for typed input from the Hub UI or testing without audio.
 
 ## Runtime Configuration
 

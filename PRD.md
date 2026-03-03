@@ -1,4 +1,6 @@
-# PRD — openclaw-even-g2-voice-gateway
+# PRD -- openclaw-even-g2-voice-gateway
+
+> **Note (2026-03-03):** This is the original PRD written before implementation. The shipped v1.0 implementation differs from this document in several specifics. Key differences are annotated inline with `[SHIPPED]` markers. The code is the source of truth -- see `docs/architecture.md` and `docs/runbook.md` for current API surface and structure.
 
 ## 0) Purpose
 Build a production-ready, community-usable **Even G2 voice gateway module** for OpenClaw so users can talk to an OpenClaw agent from G2 glasses (Telegram-like flow), with pluggable STT providers and strict engineering quality (type safety + tests).
@@ -34,7 +36,7 @@ Enable this end-to-end loop on Even G2:
 ---
 
 ## 2) Constraints (explicit)
-- Language/runtime: **TypeScript + Node.js**
+- Language/runtime: **TypeScript + Bun** [SHIPPED: runtime is Bun, not Node.js as originally planned]
 - Code quality: **DRY, SRP**, modular boundaries
 - UI layer: use **EvenRealities native UI approach/components**, aligned with:
   - https://github.com/KingAtoki/even-g2-apps
@@ -219,9 +221,11 @@ Persistence strategy:
 
 ## 6.2 Proposed Structure
 
+[SHIPPED: Actual structure differs slightly from proposal. `test/unit/` exists but is empty -- unit tests are co-located in `src/*.test.ts`. `docs/integration-frontend.md` was not created; frontend contract is documented in `ARCHITECTURE.md` instead.]
+
 ```
 services/
-  gateway-api/              # Node service: orchestration + API surface
+  gateway-api/              # Bun service: orchestration + API surface
 
 packages/
   stt-contract/             # STT interfaces + shared types
@@ -235,15 +239,14 @@ packages/
   shared-types/             # canonical domain types
 
 test/
-  unit/
-  integration/
-  contract/
+  unit/                     # (empty -- unit tests co-located in src/*.test.ts)
+  integration/              # End-to-end integration tests
+  contract/                 # STT provider contract tests
 
 docs/
   architecture.md
   security.md
   runbook.md
-  integration-frontend.md   # contract with even-g2-openclaw-chat-app repo
 ```
 
 No cross-layer shortcuts: service depends on packages, not vice versa.
@@ -315,11 +318,13 @@ All above configurable from settings UI and synced to backend config endpoint (v
 
 ## 11) API Surface (v1 draft)
 
-### `POST /api/voice/start`
-Initializes turn context (optional).
+[SHIPPED: The actual API differs from this draft. `POST /api/voice/start` and `POST /api/voice/stop` were replaced by a single `POST /api/voice/turn` endpoint. A `POST /api/text/turn` endpoint was added in quick-21.]
 
-### `POST /api/voice/stop`
-Accepts captured PCM/WAV payload and processes full pipeline.
+### `POST /api/voice/turn`
+Accepts audio payload (PCM/WAV/OGG/WebM) and processes full voice pipeline (STT + OpenClaw + response shaping).
+
+### `POST /api/text/turn`
+Accepts JSON `{"text": "..."}` and processes text pipeline (OpenClaw + response shaping, no STT).
 
 ### `POST /api/settings`
 Validates and stores runtime config.

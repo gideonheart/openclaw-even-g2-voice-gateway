@@ -2,7 +2,7 @@
 
 ## What This Is
 
-A production-ready Node.js gateway service that bridges the Even G2 glasses chat app to OpenClaw AI agents via pluggable speech-to-text providers. The chat app (separate repo) sends captured audio to this gateway, which transcribes it, forwards the transcript to an OpenClaw session over WebSocket, shapes the response for the glasses viewport, and returns it. Designed to be installed alongside OpenClaw by community self-hosters.
+A production-ready Bun/TypeScript gateway service that bridges the Even G2 glasses chat app to OpenClaw AI agents via pluggable speech-to-text providers. The chat app (separate repo) sends captured audio or text to this gateway, which transcribes audio (if applicable), forwards the transcript to an OpenClaw session over WebSocket, shapes the response for the glasses viewport, and returns it. Designed to be installed alongside OpenClaw by community self-hosters.
 
 ## Core Value
 
@@ -68,25 +68,24 @@ A user wearing Even G2 glasses can tap to speak, and reliably get an AI response
 
 ## Context
 
-Shipped v1.0 with 7,138 LOC TypeScript across a monorepo (`apps/` + `packages/`).
-Tech stack: Node.js, TypeScript strict mode, Vitest, WebSocket (OpenClaw), HTTP (STT providers).
-177 tests passing across unit, contract, and integration suites.
-Three STT providers: WhisperX (self-hosted, default), OpenAI (cloud), Custom HTTP (generic).
+Shipped v1.0 with 3,712 LOC TypeScript source (7,462 total including tests) across a monorepo (`packages/` + `services/`).
+Tech stack: Bun, TypeScript strict mode, Vitest, WebSocket (OpenClaw), HTTP (STT providers).
+220 tests passing across unit, contract, and integration suites.
+9 packages + 1 service. Three STT providers: WhisperX (self-hosted, default), OpenAI (cloud), Custom HTTP (generic).
 Runtime configuration via settings API with hot-reload for providers and OpenClaw client.
 
 **Known issues from v1.0 audit:**
 - `normalizeText` orphaned export in response-policy (dead public API surface, harmless)
-- CONF-05 settings are in-memory only (by design — env vars provide restart defaults)
-- Two stale TODO comments in index.ts and orchestrator.ts (informational only)
+- CONF-05 settings are in-memory only (by design -- env vars provide restart defaults)
 
 **Blockers for next milestone:**
-- OpenClaw WebSocket protocol details need validation against running instance
+- ~~OpenClaw WebSocket protocol details need validation against running instance~~ RESOLVED (quick-18)
 - Even Hub audio format (WebM/Opus vs CAF/AAC) needs confirmation
 
 ## Constraints
 
-- **Language/runtime**: TypeScript + Node.js — strict mode, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`
-- **Architecture**: Monorepo with `apps/` and `packages/` — no cross-layer shortcuts
+- **Language/runtime**: TypeScript + Bun -- strict mode, `noUncheckedIndexedAccess`, `exactOptionalPropertyTypes`
+- **Architecture**: Monorepo with `packages/` and `services/` -- no cross-layer shortcuts
 - **Testing**: Vitest-centric, aligned with OpenClaw standards
 - **Security**: Never commit real tokens, mask secrets in logs, CORS allowlist, request size/rate limits
 - **Code quality**: DRY, SRP, modular package boundaries
@@ -100,8 +99,8 @@ Runtime configuration via settings API with hot-reload for providers and OpenCla
 | Decision | Rationale | Outcome |
 |----------|-----------|---------|
 | Gateway-only repo (no glasses UI) | Glasses UI moved to separate chat app repo for independent release cycles and zero-secret frontend | ✓ Good — clean separation proven in v1.0 |
-| Monorepo with packages/ | Clean boundaries for STT adapters, OpenClaw client, response policy — enables reuse | ✓ Good — 7 packages with clear contracts |
-| HTTP API surface for chat app | Simpler browser compatibility, CORS-friendly, chat app makes standard fetch calls | ✓ Good — POST /api/voice/turn + settings API |
+| Monorepo with packages/ + services/ | Clean boundaries for STT adapters, OpenClaw client, response policy -- enables reuse | ✓ Good -- 9 packages + 1 service with clear contracts |
+| HTTP API surface for chat app | Simpler browser compatibility, CORS-friendly, chat app makes standard fetch calls | ✓ Good -- POST /api/voice/turn + POST /api/text/turn + settings API |
 | WebSocket for OpenClaw | Live connection to OpenClaw gateway protocol for real-time session messaging | ✓ Good — persistent connection with reconnection |
 | Split response responsibilities | Gateway does transport-safe normalization/chunk safety; frontend owns viewport pagination | ✓ Good — client-agnostic contract proven |
 | WhisperX as default provider | Self-hosted, private, no vendor lock-in — best for community self-hosters | ✓ Good — works alongside other providers |
@@ -111,4 +110,4 @@ Runtime configuration via settings API with hot-reload for providers and OpenCla
 | RateLimiter reads live config | No onChange listener needed; reads configStore on every check() call | ✓ Good — simpler than listener pattern |
 
 ---
-*Last updated: 2026-02-28 after v1.0 milestone*
+*Last updated: 2026-03-03 after quick-25 audit*

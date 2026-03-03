@@ -22,7 +22,7 @@ Progress: [██████████] 100% (v1.0)
 - Total phases: 3
 - Total plans: 2 formal + 24 quick tasks
 - Requirements: 31/31 satisfied
-- LOC: 7,138 TypeScript
+- LOC: 3,712 source / 7,462 total TypeScript
 - Tests: 220 passing
 - Timeline: ~10.5 hours
 

@@ -5,21 +5,21 @@ Voice-to-AI gateway for Even G2 smart glasses. Accepts audio, transcribes via pl
 ## Quick Start
 
 ```bash
-# Prerequisites: Node.js >= 20
+# Prerequisites: Bun (https://bun.sh)
 
 # Install
-npm install
-npm run build
+bun install
+bun run build
 
 # Configure
 cp .env.example .env
 # Edit .env with your OpenClaw URL, token, session key, and STT provider settings
 
 # Run tests
-npm test
+bun test
 
 # Start
-node services/gateway-api/dist/index.js
+bun services/gateway-api/dist/index.js
 ```
 
 The server starts on port 4400 (configurable via `PORT`).
@@ -70,6 +70,7 @@ For full architectural details, see [docs/architecture.md](docs/architecture.md)
 | Endpoint | Method | Description |
 |----------|--------|-------------|
 | `/api/voice/turn` | POST | Send audio, get AI response |
+| `/api/text/turn` | POST | Send text, get AI response (no STT) |
 | `/api/settings` | POST | Update runtime config |
 | `/api/settings` | GET | View config (secrets masked) |
 | `/healthz` | GET | Liveness probe |
@@ -111,11 +112,11 @@ services/
 ## Development
 
 ```bash
-npm test              # Run all tests
-npm run test:watch    # Watch mode
-npm run typecheck     # Type-check without emitting
-npm run lint          # Lint
-npm run format        # Format
+bun test              # Run all tests
+bun run test:watch    # Watch mode
+bun run typecheck     # Type-check without emitting
+bun run lint          # Lint
+bun run format        # Format
 ```
 
 ## License

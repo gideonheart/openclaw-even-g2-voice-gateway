@@ -97,72 +97,64 @@ Runtime provider switching and config-driven re-initialization.
 **Problem:** This is now incorrect. Commit d5df520 (PIPE-07) added `ConfigStore.onChange()` and `registerProviderRebuilder()`, which rebuilds STT provider instances when their config section changes via `POST /api/settings`. Provider config changes (URLs, API keys, model names) take effect on the next request without restart.
 **Fix:** Update the note to reflect that STT provider config changes are applied at runtime via the provider rebuilder.
 
-### 2. OpenClaw client not re-initialized on config change
+### 2. OpenClaw client not re-initialized on config change -- RESOLVED
+
+**Status:** RESOLVED in quick-21 (2026-03-03) by `openclaw-rebuilder.ts`
 
 **File:** `services/gateway-api/src/index.ts:44-49`
-**Problem:** The `OpenClawClient` is constructed once at startup with `config.openclawGatewayUrl` and `config.openclawGatewayToken` from the initial `loadConfig()`. When `openclawGatewayUrl` or `openclawGatewayToken` are changed via `POST /api/settings`, the ConfigStore updates its internal state, but the `OpenClawClient` instance retains its original WebSocket connection URL and auth token. The `provider-rebuilder.ts` only handles STT providers.
+**Original problem:** The `OpenClawClient` was constructed once at startup. Changing `openclawGatewayUrl` or `openclawGatewayToken` via `POST /api/settings` had no effect until restart.
 
-**Impact:** Changing OpenClaw connection settings via the settings API silently has no effect until the next process restart. A user who changes the OpenClaw URL through the settings API will continue hitting the old endpoint. No error is raised -- the old connection continues working (or failing) with its original config.
+**Resolution:** `openclaw-rebuilder.ts` registers a `ConfigStore.onChange()` listener that disconnects the old client, creates a new `OpenClawClient` with updated config, and swaps the reference on `deps`. The new client connects lazily on the next `sendTranscript()` call.
 
-**Severity:** Medium. The primary use case (changing STT providers at runtime) works correctly. OpenClaw connection changes are less common, but the settings API accepts them without indicating they require a restart.
+### 3. RateLimiter uses stale config -- RESOLVED
 
-### 3. RateLimiter uses stale config
+**Status:** RESOLVED in quick-21 (2026-03-03)
 
-**File:** `services/gateway-api/src/server.ts:69`
-**Problem:** The `RateLimiter` is constructed once in `createGatewayServer()` with `configStore.get().server.rateLimitPerMinute`. If `server.rateLimitPerMinute` is subsequently changed via `POST /api/settings`, the rate limiter continues enforcing the original value. There is no `ConfigStore.onChange()` listener for the rate limiter.
+**File:** `services/gateway-api/src/server.ts`
+**Original problem:** The `RateLimiter` cached `rateLimitPerMinute` at construction time, ignoring runtime changes.
 
-**Impact:** Low. Rate limit tuning at runtime is uncommon. The workaround is a process restart. If the rate limit is lowered via the API, the old (higher) limit remains enforced until restart; if raised, the old (lower) limit continues restricting traffic.
+**Resolution:** `RateLimiter` now takes a `ConfigStore` reference and calls `this.configStore.get().server.rateLimitPerMinute` on every `check()` call. No onChange listener needed -- live reads are simpler and correct.
 
-### 4. RateLimiter memory leak under diverse-IP load
+### 4. RateLimiter memory leak under diverse-IP load -- RESOLVED
 
-**File:** `services/gateway-api/src/server.ts:39`
-**Problem:** The `RateLimiter`'s `windows` Map stores `{ count, resetAt }` for each unique IP address. Entries are overwritten when a new window starts (`now >= window.resetAt`), but old entries from IPs that stop making requests are never removed. Under sustained load from many distinct IP addresses (e.g., behind a load balancer forwarding `X-Forwarded-For`, or a DDoS with spoofed source IPs), the Map grows without bound.
+**Status:** RESOLVED in quick-21 (2026-03-03)
 
-**Impact:** Memory grows linearly with unique client IPs over time. For typical single-household deployment alongside OpenClaw, this is negligible. For deployments behind a load balancer or CDN where `remoteAddress` varies widely, this could become a problem over days/weeks of uptime.
+**File:** `services/gateway-api/src/server.ts`
+**Original problem:** The `RateLimiter`'s `windows` Map never pruned expired entries, growing without bound under diverse-IP load.
 
-**Mitigation:** Add periodic cleanup of entries past their `resetAt` timestamp (e.g., `setInterval` with `.unref()`), or replace with a bounded LRU cache.
+**Resolution:** `RateLimiter` now runs a periodic prune every 60 seconds via `setInterval().unref()` that removes expired windows. A hard cap of 10,000 entries triggers eager pruning between intervals. A `destroy()` method cleans up the interval for test teardown and graceful shutdown.
 
-### 5. orchestrator.ts:114 TODO -- model field hardcoded to null
+### 5. orchestrator.ts TODO -- model field hardcoded to null -- RESOLVED
 
-**File:** `services/gateway-api/src/orchestrator.ts:114`
-**Code:** `model: null, // TODO(phase-2): thread SttResult.model when available`
-**Problem:** The `GatewayReply.meta.model` field is always `null`. The `SttResult` type returned by providers does not currently carry model information, and even if it did, it would not be threaded through to the response envelope. The `TODO(phase-2)` comment indicates this was intentionally deferred.
+**Status:** RESOLVED in quick-21 (2026-03-03) clean rewrite
 
-**Impact:** Low. The field exists in the response schema for forward compatibility. Clients that display provider model info will see `null`. This is cosmetic -- no functional impact.
+**File:** `services/gateway-api/src/orchestrator.ts`
+**Original problem:** `GatewayReply.meta.model` was always `null` with a TODO comment.
 
-### 6. OpenClaw client uses constructor config, not ConfigStore
+**Resolution:** The quick-21 rewrite threads `sttResult.model` through to `GatewayReply.meta.model` via the shared `sendAndShape()` helper. The TODO comment was removed. For text turns, `model` is correctly `null` (no STT provider involved).
 
-**File:** `packages/openclaw-client/src/openclaw-client.ts:71-74`, `services/gateway-api/src/index.ts:44-49`
-**Problem:** The `OpenClawClient` class stores its config as a private readonly field set in the constructor. It uses `this.config.gatewayUrl` and `this.config.authToken` for every connection attempt. Unlike STT providers (which are rebuilt via `registerProviderRebuilder` when their config changes), the OpenClaw client has no mechanism to receive updated config.
+### 6. OpenClaw client uses constructor config, not ConfigStore -- RESOLVED
 
-This is architecturally different from how STT providers now work post-PIPE-07: STT providers are stateless constructors that are destroyed and recreated on config change. The OpenClaw client is stateful (persistent WebSocket connection with pending turn tracking), making hot-reload more complex -- it would need to drain pending turns, disconnect, and reconnect with new config.
+**Status:** RESOLVED in quick-21 (2026-03-03) -- same fix as Finding #2
 
-**Impact:** Same as Finding #2. This entry documents the architectural pattern difference that makes the fix non-trivial compared to STT provider rebuilding.
+**Original problem:** The `OpenClawClient` class had no mechanism to receive updated config post-construction.
+
+**Resolution:** `openclaw-rebuilder.ts` handles this by disconnecting the old client (which rejects pending turns gracefully), creating a new `OpenClawClient` with the updated config, and swapping the mutable `deps.openclawClient` reference. The architectural pattern now matches STT provider rebuilding: destroy and recreate on config change.
 
 ---
 
 ## Tech Debt Summary
 
-### Should fix before production
+### Post-Release Fixes (all resolved in quick-21, 2026-03-03)
 
-| # | Finding | Effort | Risk if ignored |
-|---|---------|--------|-----------------|
-| 1 | Stale runbook note (`docs/runbook.md:161`) | 5 minutes | Operators follow incorrect restart procedure |
-
-### Should fix in v1.1
-
-| # | Finding | Effort | Risk if ignored |
-|---|---------|--------|-----------------|
-| 2 | OpenClaw client re-init gap | 2-4 hours | Silent config drift when OpenClaw URL/token changed via API |
-| 4 | RateLimiter memory leak | 1-2 hours | Memory growth under diverse-IP load over long uptime |
-
-### Nice to have
-
-| # | Finding | Effort | Risk if ignored |
-|---|---------|--------|-----------------|
-| 3 | RateLimiter stale config | 30 minutes | Rate limit changes via API have no effect until restart |
-| 5 | Model field threading | 1 hour | `meta.model` always null in response -- cosmetic only |
-| 6 | OpenClaw client pattern gap | Covered by #2 | Architectural asymmetry between STT and OpenClaw config handling |
+| # | Finding | Status | Resolution |
+|---|---------|--------|------------|
+| 1 | Stale runbook note (`docs/runbook.md:161`) | RESOLVED | Runbook updated to reflect runtime config changes take effect immediately |
+| 2 | OpenClaw client re-init gap | RESOLVED | `openclaw-rebuilder.ts` rebuilds client on config change |
+| 3 | RateLimiter stale config | RESOLVED | Reads `configStore.get()` on every `check()` call |
+| 4 | RateLimiter memory leak | RESOLVED | Periodic prune (60s interval) + 10k hard cap + `destroy()` |
+| 5 | Model field threading | RESOLVED | `sttResult.model` threaded through `sendAndShape()` helper |
+| 6 | OpenClaw client pattern gap | RESOLVED | Same as #2 -- architectural parity with STT provider rebuilding |
 
 ---
 
@@ -181,26 +173,18 @@ This is architecturally different from how STT providers now work post-PIPE-07: 
 
 ## Top 3 Post-v1 Priorities
 
-### 1. OpenClaw client runtime re-initialization
+### ~~1. OpenClaw client runtime re-initialization~~ RESOLVED (quick-21)
 
-**Why:** Commit d5df520 established the `ConfigStore.onChange()` pattern for STT providers, but the OpenClaw client was not included. This creates an asymmetry where STT provider config is runtime-mutable but OpenClaw connection config silently ignores API changes. Users who discover they can change STT settings at runtime will expect the same for OpenClaw settings.
+Completed via `openclaw-rebuilder.ts`. See Finding #2 above.
 
-**What:** Extend the `ConfigStore.onChange()` pattern to handle OpenClaw client rebuilding. This is more complex than STT provider rebuilding because the client is stateful (persistent WebSocket with pending turns). The implementation needs to: (a) drain or reject pending turns, (b) disconnect the old WebSocket, (c) create a new `OpenClawClient` with updated config, (d) connect and verify health. The `deps.openclawClient` reference in `ServerDeps` would need to become mutable or wrapped in an accessor.
+### ~~2. RateLimiter hardening~~ RESOLVED (quick-21)
 
-**Files:** `services/gateway-api/src/index.ts`, `services/gateway-api/src/server.ts`, potentially a new `openclaw-rebuilder.ts`
-
-### 2. RateLimiter hardening
-
-**Why:** The current `RateLimiter` has two issues: (a) the `windows` Map never prunes expired entries, causing unbounded memory growth under diverse-IP load, and (b) the rate limit value is captured once at server creation and does not react to config changes.
-
-**What:** Add a periodic cleanup interval (e.g., every 60 seconds via `setInterval().unref()`) that removes entries where `now >= resetAt`. Optionally, make the rate limiter read `configStore.get().server.rateLimitPerMinute` on each `check()` call instead of caching the value, or register a `ConfigStore.onChange()` listener. Consider replacing the plain Map with a bounded LRU cache if deployment scenarios include high-cardinality IP addresses.
-
-**Files:** `services/gateway-api/src/server.ts` (RateLimiter class)
+Completed: periodic prune, 10k hard cap, live config reads. See Findings #3-4 above.
 
 ### 3. Integration testing against live services
 
-**Why:** The current test suite uses mocks for all external service interactions (WhisperX API, OpenAI API, OpenClaw WebSocket). The OpenClaw WebSocket protocol (message format, auth handshake, session lifecycle) and Even Hub audio format (codec, container, sample rate) have not been validated against running instances. Protocol mismatches will only surface during real deployment.
+**Why:** The current test suite uses mocks for all external service interactions (WhisperX API, OpenAI API, OpenClaw WebSocket). The OpenClaw WebSocket protocol was validated in quick-18 but Even Hub audio format (codec, container, sample rate) has not been tested with real hardware. Protocol mismatches may surface during real deployment.
 
-**What:** Create a smoke test script (`test/smoke/live-voice-turn.sh` or similar) that: (a) sends a real audio file to `POST /api/voice/turn`, (b) verifies STT transcription against a running WhisperX instance, (c) validates the OpenClaw WebSocket handshake and message exchange. This can run in CI with service containers or manually against the user's existing WhisperX and OpenClaw instances. Also capture a real audio sample from Even G2 glasses to confirm the exact format (WebM/Opus, CAF/AAC, or WAV) and add it as a test fixture.
+**What:** Create a smoke test script (`test/smoke/live-voice-turn.sh` or similar) that: (a) sends a real audio file to `POST /api/voice/turn`, (b) verifies STT transcription against a running WhisperX instance, (c) validates the OpenClaw WebSocket handshake and message exchange. Also capture a real audio sample from Even G2 glasses to confirm the exact format (WebM/Opus, CAF/AAC, or WAV) and add it as a test fixture.
 
 **Files:** New `test/smoke/` directory, test fixture audio files
