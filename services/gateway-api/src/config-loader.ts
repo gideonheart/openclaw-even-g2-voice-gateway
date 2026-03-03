@@ -55,12 +55,26 @@ function csvToArray(raw: string | undefined): string[] {
     .filter((s) => s.length > 0);
 }
 
+/**
+ * Resolve the OpenClaw upstream WebSocket URL via a 3-step fallback chain:
+ * 1. Explicit OPENCLAW_GATEWAY_URL wins (operator override).
+ * 2. OPENCLAW_GATEWAY_PORT (set by OpenClaw systemd) derives ws://127.0.0.1:{port}.
+ * 3. Last resort: ws://localhost:3000 (matches .env.example default).
+ */
+function resolveOpenClawUrl(env: Record<string, string | undefined>): string {
+  const explicit = env["OPENCLAW_GATEWAY_URL"];
+  if (explicit !== undefined && explicit !== "") return explicit;
+  const port = env["OPENCLAW_GATEWAY_PORT"];
+  if (port !== undefined && port !== "") return `ws://127.0.0.1:${port}`;
+  return "ws://localhost:3000";
+}
+
 /** Load gateway configuration from environment variables. */
 export function loadConfig(
   env: Record<string, string | undefined> = process.env,
 ): GatewayConfig {
   return {
-    openclawGatewayUrl: strOrDefault(env["OPENCLAW_GATEWAY_URL"], "ws://localhost:3000"),
+    openclawGatewayUrl: resolveOpenClawUrl(env),
     openclawGatewayToken: strOrDefault(env["OPENCLAW_GATEWAY_TOKEN"], ""),
     openclawSessionKey: createSessionKey(strOrDefault(env["OPENCLAW_SESSION_KEY"], "default")),
     sttProvider: createProviderId(strOrDefault(env["STT_PROVIDER"], "whisperx")),
