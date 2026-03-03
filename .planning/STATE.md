@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
 Status: PARKED-IDLE -- responds only to explicit engineering tasks
-Last activity: 2026-03-03 - Clean rewrite of gateway-api service (quick-21)
+Last activity: 2026-03-03 - Fix OpenClaw connectivity regression (quick-22)
 
 Progress: [██████████] 100% (v1.0)
 
@@ -20,10 +20,10 @@ Progress: [██████████] 100% (v1.0)
 
 **v1.0 Summary:**
 - Total phases: 3
-- Total plans: 2 formal + 21 quick tasks
+- Total plans: 2 formal + 22 quick tasks
 - Requirements: 31/31 satisfied
 - LOC: 7,138 TypeScript
-- Tests: 210 passing
+- Tests: 215 passing
 - Timeline: ~10.5 hours
 
 ## Accumulated Context
@@ -37,6 +37,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase quick-19]: Documented connection architecture: PORT=4400 inbound vs OPENCLAW_GATEWAY_URL outbound, ASCII flow diagrams, remote access guidance
 - [Phase quick-20]: CLAUDE.md parked-idle directive confirmed intact -- project re-enters PARKED-IDLE after quick-19 architecture docs
 - [Phase quick-21]: Clean rewrite of gateway-api: shared sendAndShape helper, declarative validation, 160-line net reduction, all 210 tests pass
+- [Phase quick-22]: Fix OpenClaw connectivity regression: smart URL derivation from OPENCLAW_GATEWAY_PORT, 5 new regression tests, 215 tests pass
 
 ### Pending Todos
 
@@ -66,9 +67,10 @@ None — v1.0 complete.
 | 19 | Document gateway connection architecture, port/URL distinction, remote access | 2026-03-01 | 433fb84 | [19-document-gateway-architecture-and-connec](./quick/19-document-gateway-architecture-and-connec/) |
 | 20 | Re-enter parked-idle mode after quick-19 verification | 2026-03-01 | 89faa4d | [20-enter-parked-idle-mode-again-after-quick](./quick/20-enter-parked-idle-mode-again-after-quick/) |
 | 21 | Clean rewrite of all 7 gateway-api source files (160-line reduction, 210 tests pass) | 2026-03-03 | 494979d | [21-rebuild-g2-voice-gateway-clean-rewrite](./quick/21-rebuild-g2-voice-gateway-clean-rewrite/) |
+| 22 | Fix OpenClaw connectivity regression: smart URL from OPENCLAW_GATEWAY_PORT, 5 new tests | 2026-03-03 | 682c813 | [22-fix-the-active-openclaw-connectivity-reg](./quick/22-fix-the-active-openclaw-connectivity-reg/) |
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed quick-21 gateway-api clean rewrite.
+Stopped at: Completed quick-22 OpenClaw connectivity regression fix.
 Resume file: None
