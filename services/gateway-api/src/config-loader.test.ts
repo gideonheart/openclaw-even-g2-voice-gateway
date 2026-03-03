@@ -153,4 +153,51 @@ describe("loadConfig", () => {
     const config = loadConfig({ OPENCLAW_GATEWAY_TOKEN: "correct-token" });
     expect(config.openclawGatewayToken).toBe("correct-token");
   });
+
+  // -- PORT validation edge cases (quick-23 hardening) --
+
+  it("throws on non-numeric OPENCLAW_GATEWAY_PORT", () => {
+    expect(() => loadConfig({ OPENCLAW_GATEWAY_PORT: "abc" })).toThrow(OperatorError);
+    try {
+      loadConfig({ OPENCLAW_GATEWAY_PORT: "abc" });
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperatorError);
+      expect((err as OperatorError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("throws on zero OPENCLAW_GATEWAY_PORT", () => {
+    expect(() => loadConfig({ OPENCLAW_GATEWAY_PORT: "0" })).toThrow(OperatorError);
+    try {
+      loadConfig({ OPENCLAW_GATEWAY_PORT: "0" });
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperatorError);
+      expect((err as OperatorError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("throws on negative OPENCLAW_GATEWAY_PORT", () => {
+    expect(() => loadConfig({ OPENCLAW_GATEWAY_PORT: "-1" })).toThrow(OperatorError);
+    try {
+      loadConfig({ OPENCLAW_GATEWAY_PORT: "-1" });
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperatorError);
+      expect((err as OperatorError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("throws on out-of-range OPENCLAW_GATEWAY_PORT", () => {
+    expect(() => loadConfig({ OPENCLAW_GATEWAY_PORT: "99999" })).toThrow(OperatorError);
+    try {
+      loadConfig({ OPENCLAW_GATEWAY_PORT: "99999" });
+    } catch (err) {
+      expect(err).toBeInstanceOf(OperatorError);
+      expect((err as OperatorError).code).toBe(ErrorCodes.INVALID_CONFIG);
+    }
+  });
+
+  it("normalizes leading-zero OPENCLAW_GATEWAY_PORT", () => {
+    const config = loadConfig({ OPENCLAW_GATEWAY_PORT: "03434" });
+    expect(config.openclawGatewayUrl).toBe("ws://127.0.0.1:3434");
+  });
 });

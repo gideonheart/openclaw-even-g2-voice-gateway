@@ -65,7 +65,17 @@ function resolveOpenClawUrl(env: Record<string, string | undefined>): string {
   const explicit = env["OPENCLAW_GATEWAY_URL"];
   if (explicit !== undefined && explicit !== "") return explicit;
   const port = env["OPENCLAW_GATEWAY_PORT"];
-  if (port !== undefined && port !== "") return `ws://127.0.0.1:${port}`;
+  if (port !== undefined && port !== "") {
+    const n = parseInt(port, 10);
+    if (Number.isNaN(n) || n <= 0 || n > 65535) {
+      throw new OperatorError(
+        ErrorCodes.INVALID_CONFIG,
+        "Invalid OPENCLAW_GATEWAY_PORT",
+        `Expected a port number (1-65535), got "${port}"`,
+      );
+    }
+    return `ws://127.0.0.1:${n}`;
+  }
   return "ws://localhost:3000";
 }
 
