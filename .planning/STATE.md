@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
 Status: PARKED-IDLE -- responds only to explicit engineering tasks
-Last activity: 2026-03-03 - Self-review quick-22: port validation hardening (quick-23)
+Last activity: 2026-03-03 - Enter parked-idle mode after quick-23 (quick-24)
 
 Progress: [██████████] 100% (v1.0)
 
@@ -20,7 +20,7 @@ Progress: [██████████] 100% (v1.0)
 
 **v1.0 Summary:**
 - Total phases: 3
-- Total plans: 2 formal + 23 quick tasks
+- Total plans: 2 formal + 24 quick tasks
 - Requirements: 31/31 satisfied
 - LOC: 7,138 TypeScript
 - Tests: 220 passing
@@ -39,6 +39,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase quick-21]: Clean rewrite of gateway-api: shared sendAndShape helper, declarative validation, 160-line net reduction, all 210 tests pass
 - [Phase quick-22]: Fix OpenClaw connectivity regression: smart URL derivation from OPENCLAW_GATEWAY_PORT, 5 new regression tests, 215 tests pass
 - [Phase quick-23]: Self-review quick-22: port validation hardening (parseInt + range 1-65535), 5 new edge-case tests, 220 tests pass
+- [Phase quick-24]: Re-enter PARKED-IDLE after quick-23 port validation hardening self-review
 
 ### Pending Todos
 
@@ -70,9 +71,10 @@ None — v1.0 complete.
 | 21 | Clean rewrite of all 7 gateway-api source files (160-line reduction, 210 tests pass) | 2026-03-03 | 494979d | [21-rebuild-g2-voice-gateway-clean-rewrite](./quick/21-rebuild-g2-voice-gateway-clean-rewrite/) |
 | 22 | Fix OpenClaw connectivity regression: smart URL from OPENCLAW_GATEWAY_PORT, 5 new tests | 2026-03-03 | 682c813 | [22-fix-the-active-openclaw-connectivity-reg](./quick/22-fix-the-active-openclaw-connectivity-reg/) |
 | 23 | Self-review quick-22: port validation hardening, 5 new edge-case tests, 220 total | 2026-03-03 | 17ec058 | [23-self-review-quick-22-openclaw-url-fallba](./quick/23-self-review-quick-22-openclaw-url-fallba/) |
+| 24 | Enter parked-idle mode after quick-23 | 2026-03-03 | PENDING | [24-enter-parked-idle-mode-after-quick-23](./quick/24-enter-parked-idle-mode-after-quick-23/) |
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Completed quick-23 self-review of quick-22 with port validation hardening.
+Stopped at: Parked after quick-23 self-review. 5 uncommitted WIP files noted (shared-types branded/voice-turn types, orchestrator tests, integration test) -- user decision pending.
 Resume file: None
