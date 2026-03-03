@@ -120,4 +120,37 @@ describe("loadConfig", () => {
       expect((err as OperatorError).code).toBe(ErrorCodes.INVALID_CONFIG);
     }
   });
+
+  // -- URL derivation fallback chain (quick-22 regression tests) --
+
+  it("derives URL from OPENCLAW_GATEWAY_PORT when OPENCLAW_GATEWAY_URL is unset", () => {
+    const config = loadConfig({ OPENCLAW_GATEWAY_PORT: "3434" });
+    expect(config.openclawGatewayUrl).toBe("ws://127.0.0.1:3434");
+  });
+
+  it("explicit OPENCLAW_GATEWAY_URL takes precedence over OPENCLAW_GATEWAY_PORT", () => {
+    const config = loadConfig({
+      OPENCLAW_GATEWAY_URL: "ws://custom:5000",
+      OPENCLAW_GATEWAY_PORT: "3434",
+    });
+    expect(config.openclawGatewayUrl).toBe("ws://custom:5000");
+  });
+
+  it("falls back to ws://localhost:3000 when neither URL nor PORT set", () => {
+    const config = loadConfig({});
+    expect(config.openclawGatewayUrl).toBe("ws://localhost:3000");
+  });
+
+  it("empty OPENCLAW_GATEWAY_URL falls through to PORT-based derivation", () => {
+    const config = loadConfig({
+      OPENCLAW_GATEWAY_URL: "",
+      OPENCLAW_GATEWAY_PORT: "3434",
+    });
+    expect(config.openclawGatewayUrl).toBe("ws://127.0.0.1:3434");
+  });
+
+  it("stale shell token does not affect config when token is explicitly provided", () => {
+    const config = loadConfig({ OPENCLAW_GATEWAY_TOKEN: "correct-token" });
+    expect(config.openclawGatewayToken).toBe("correct-token");
+  });
 });
