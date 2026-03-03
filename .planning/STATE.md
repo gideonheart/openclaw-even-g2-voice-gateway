@@ -2,7 +2,7 @@
 
 ## Project Reference
 
-See: .planning/PROJECT.md (updated 2026-02-28)
+See: .planning/PROJECT.md (updated 2026-03-03)
 
 **Core value:** A user wearing Even G2 glasses can tap to speak and reliably get an AI response back -- the gateway orchestrates audio to transcription to OpenClaw to shaped response without losing turns or leaking secrets.
 **Current focus:** v1.0 shipped -- PARKED-IDLE mode active (see CLAUDE.md)
@@ -12,7 +12,7 @@ See: .planning/PROJECT.md (updated 2026-02-28)
 Phase: v1.0 complete (3 phases shipped)
 Plan: N/A
 Status: PARKED-IDLE -- responds only to explicit engineering tasks
-Last activity: 2026-03-03 - Enter parked-idle mode after quick-23 (quick-24)
+Last activity: 2026-03-03 - Audit and fix code-vs-docs alignment (quick-25)
 
 Progress: [██████████] 100% (v1.0)
 
@@ -20,7 +20,7 @@ Progress: [██████████] 100% (v1.0)
 
 **v1.0 Summary:**
 - Total phases: 3
-- Total plans: 2 formal + 24 quick tasks
+- Total plans: 2 formal + 25 quick tasks
 - Requirements: 31/31 satisfied
 - LOC: 3,712 source / 7,462 total TypeScript
 - Tests: 220 passing
@@ -40,6 +40,7 @@ Decisions are logged in PROJECT.md Key Decisions table.
 - [Phase quick-22]: Fix OpenClaw connectivity regression: smart URL derivation from OPENCLAW_GATEWAY_PORT, 5 new regression tests, 215 tests pass
 - [Phase quick-23]: Self-review quick-22: port validation hardening (parseInt + range 1-65535), 5 new edge-case tests, 220 tests pass
 - [Phase quick-24]: Re-enter PARKED-IDLE after quick-23 port validation hardening self-review
+- [Phase quick-25]: Audit code-vs-docs alignment: 42 findings fixed across 10 doc files (runtime Bun not Node, missing text turn endpoint, stale stats, resolved tech debt annotations)
 
 ### Pending Todos
 
@@ -72,9 +73,10 @@ None — v1.0 complete.
 | 22 | Fix OpenClaw connectivity regression: smart URL from OPENCLAW_GATEWAY_PORT, 5 new tests | 2026-03-03 | 682c813 | [22-fix-the-active-openclaw-connectivity-reg](./quick/22-fix-the-active-openclaw-connectivity-reg/) |
 | 23 | Self-review quick-22: port validation hardening, 5 new edge-case tests, 220 total | 2026-03-03 | 17ec058 | [23-self-review-quick-22-openclaw-url-fallba](./quick/23-self-review-quick-22-openclaw-url-fallba/) |
 | 24 | Enter parked-idle mode after quick-23 | 2026-03-03 | 909b823 | [24-enter-parked-idle-mode-after-quick-23](./quick/24-enter-parked-idle-mode-after-quick-23/) |
+| 25 | Audit and fix code-vs-docs alignment (42 findings, 10 files) | 2026-03-03 | 37fd83e | [25-audit-code-vs-docs-alignment-update-plan](./quick/25-audit-code-vs-docs-alignment-update-plan/) |
 
 ## Session Continuity
 
 Last session: 2026-03-03
-Stopped at: Parked after quick-23 self-review. 5 uncommitted WIP files noted (shared-types branded/voice-turn types, orchestrator tests, integration test) -- user decision pending.
+Stopped at: Completed quick-25 code-vs-docs audit on branch quick-25/audit-code-vs-docs (pushed to origin). 5 pre-existing uncommitted WIP .ts files remain (shared-types branded/voice-turn types, orchestrator tests, server, integration test) -- user decision pending.
 Resume file: None
