@@ -71,7 +71,7 @@ None — v1.0 complete.
 | 21 | Clean rewrite of all 7 gateway-api source files (160-line reduction, 210 tests pass) | 2026-03-03 | 494979d | [21-rebuild-g2-voice-gateway-clean-rewrite](./quick/21-rebuild-g2-voice-gateway-clean-rewrite/) |
 | 22 | Fix OpenClaw connectivity regression: smart URL from OPENCLAW_GATEWAY_PORT, 5 new tests | 2026-03-03 | 682c813 | [22-fix-the-active-openclaw-connectivity-reg](./quick/22-fix-the-active-openclaw-connectivity-reg/) |
 | 23 | Self-review quick-22: port validation hardening, 5 new edge-case tests, 220 total | 2026-03-03 | 17ec058 | [23-self-review-quick-22-openclaw-url-fallba](./quick/23-self-review-quick-22-openclaw-url-fallba/) |
-| 24 | Enter parked-idle mode after quick-23 | 2026-03-03 | PENDING | [24-enter-parked-idle-mode-after-quick-23](./quick/24-enter-parked-idle-mode-after-quick-23/) |
+| 24 | Enter parked-idle mode after quick-23 | 2026-03-03 | 909b823 | [24-enter-parked-idle-mode-after-quick-23](./quick/24-enter-parked-idle-mode-after-quick-23/) |
 
 ## Session Continuity
 
