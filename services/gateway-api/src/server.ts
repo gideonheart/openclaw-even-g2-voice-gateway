@@ -1,28 +1,23 @@
 /**
  * HTTP server with all API endpoints.
  *
- * Endpoints:
- * - POST /api/voice/turn — execute a voice turn (audio → response)
- * - POST /api/text/turn  — execute a text turn (text → response, skips STT)
- * - POST /api/settings — update runtime configuration
- * - GET  /api/settings — get safe config (secrets masked)
- * - GET  /healthz — liveness check
- * - GET  /readyz — readiness check (dependencies healthy)
+ * Routes:
+ *   POST /api/voice/turn  -- execute a voice turn (audio -> response)
+ *   POST /api/text/turn   -- execute a text turn  (text  -> response, no STT)
+ *   POST /api/settings    -- validate and apply runtime config patch
+ *   GET  /api/settings    -- return safe config (secrets masked)
+ *   GET  /healthz         -- liveness probe
+ *   GET  /readyz          -- readiness probe (dependency health)
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
 import type {
   GatewayConfig,
-  SafeGatewayConfig,
   ProviderId,
-  SessionKey,
   AudioPayload,
-  AudioContentType,
-  GatewayReply,
 } from "@voice-gateway/shared-types";
 import {
   createTurnId,
-  createSessionKey,
   UserError,
   OperatorError,
   ErrorCodes,
@@ -34,7 +29,7 @@ import { executeVoiceTurn, executeTextTurn } from "./orchestrator.js";
 import type { Logger } from "@voice-gateway/logging";
 import { ConfigStore, validateSettingsPatch } from "./config-store.js";
 
-// ── Rate Limiter ──
+// -- Rate Limiter --
 
 export class RateLimiter {
   private readonly windows = new Map<string, { count: number; resetAt: number }>();
@@ -47,10 +42,12 @@ export class RateLimiter {
     this.pruneHandle.unref();
   }
 
+  /** Returns true if the request is allowed, false if rate-limited. */
   check(key: string): boolean {
     const now = Date.now();
     const maxPerMinute = this.configStore.get().server.rateLimitPerMinute;
     const window = this.windows.get(key);
+
     if (!window || now >= window.resetAt) {
       this.windows.set(key, { count: 1, resetAt: now + 60_000 });
     } else {
@@ -58,10 +55,8 @@ export class RateLimiter {
       if (window.count > maxPerMinute) return false;
     }
 
-    // Hard cap: eager prune if map grows beyond 10,000 entries
-    if (this.windows.size > 10_000) {
-      this.prune();
-    }
+    // Hard cap: eagerly prune if map grows beyond 10k entries
+    if (this.windows.size > 10_000) this.prune();
 
     return true;
   }
@@ -70,9 +65,7 @@ export class RateLimiter {
   prune(): void {
     const now = Date.now();
     for (const [key, entry] of this.windows) {
-      if (now >= entry.resetAt) {
-        this.windows.delete(key);
-      }
+      if (now >= entry.resetAt) this.windows.delete(key);
     }
   }
 
@@ -82,6 +75,8 @@ export class RateLimiter {
   }
 }
 
+// -- Server dependencies --
+
 export interface ServerDeps {
   readonly configStore: ConfigStore;
   readonly sttProviders: Map<string, SttProvider>;
@@ -90,75 +85,69 @@ export interface ServerDeps {
   ready: boolean;
 }
 
+// -- Body size constant --
+
+/** Maximum body size for text turn / settings requests (64 KB). */
+const MAX_TEXT_BODY_BYTES = 64 * 1024;
+
+// -- Server factory --
+
 /** Create and return the HTTP server (not yet listening). */
 export function createGatewayServer(deps: ServerDeps): Server {
   const log = deps.logger.child({ component: "http-server" });
   const rateLimiter = new RateLimiter(deps.configStore);
 
-  const server = createServer(async (req, res) => {
+  return createServer(async (req, res) => {
     const turnId = createTurnId();
     const requestLog = log.child({ turnId, method: req.method, url: req.url });
 
     try {
-      // Readiness gate — always allow /healthz (liveness probe)
+      // Readiness gate -- always allow /healthz (liveness probe)
       if (!deps.ready && req.url !== "/healthz") {
-        sendJson(res, 503, {
-          error: "Gateway is starting up",
-          code: ErrorCodes.NOT_READY,
-        });
-        return;
+        return sendJson(res, 503, { error: "Gateway is starting up", code: ErrorCodes.NOT_READY });
       }
 
-      // CORS handling (SAFE-07: strict rejection for non-allowlisted origins)
+      // CORS handling
       const serverCfg = deps.configStore.get().server;
       if (handleCors(req, res, serverCfg.corsOrigins, serverCfg.allowNullOrigin)) return;
 
       const url = req.url ?? "";
       const method = req.method ?? "GET";
 
-      // Route
-      if (method === "POST" && url === "/api/voice/turn") {
-        // Rate limit the expensive voice turn endpoint
-        const clientIp = req.socket.remoteAddress ?? "unknown";
-        if (!rateLimiter.check(clientIp)) {
-          sendJson(res, 429, { error: "Too many requests. Please wait.", code: ErrorCodes.RATE_LIMITED });
-          return;
-        }
-        await handleVoiceTurn(req, res, deps, turnId, requestLog);
-      } else if (method === "POST" && url === "/api/text/turn") {
-        // Rate limit the text turn endpoint
-        const clientIp = req.socket.remoteAddress ?? "unknown";
-        if (!rateLimiter.check(clientIp)) {
-          sendJson(res, 429, { error: "Too many requests. Please wait.", code: ErrorCodes.RATE_LIMITED });
-          return;
-        }
-        await handleTextTurn(req, res, deps, turnId, requestLog);
-      } else if (method === "POST" && url === "/api/settings") {
-        // SAFE-06: Rate-limit the settings endpoint
-        const clientIp = req.socket.remoteAddress ?? "unknown";
-        if (!rateLimiter.check(clientIp)) {
-          sendJson(res, 429, { error: "Too many requests. Please wait.", code: ErrorCodes.RATE_LIMITED });
-          return;
-        }
-        await handlePostSettings(req, res, deps, requestLog);
-      } else if (method === "GET" && url === "/api/settings") {
-        handleGetSettings(res, deps.configStore);
-      } else if (method === "GET" && url === "/healthz") {
-        handleHealthz(res);
-      } else if (method === "GET" && url === "/readyz") {
-        await handleReadyz(res, deps);
-      } else {
-        sendJson(res, 404, { error: "Not found" });
+      // -- Routing --
+
+      if (method === "GET" && url === "/healthz") {
+        return handleHealthz(res);
       }
+
+      if (method === "GET" && url === "/readyz") {
+        return await handleReadyz(res, deps);
+      }
+
+      if (method === "GET" && url === "/api/settings") {
+        return sendJson(res, 200, deps.configStore.getSafe());
+      }
+
+      // POST routes share a rate-limit gate
+      if (method === "POST" && (url === "/api/voice/turn" || url === "/api/text/turn" || url === "/api/settings")) {
+        const clientIp = req.socket.remoteAddress ?? "unknown";
+        if (!rateLimiter.check(clientIp)) {
+          return sendJson(res, 429, { error: "Too many requests. Please wait.", code: ErrorCodes.RATE_LIMITED });
+        }
+
+        if (url === "/api/voice/turn") return await handleVoiceTurn(req, res, deps, turnId, requestLog);
+        if (url === "/api/text/turn") return await handleTextTurn(req, res, deps, turnId, requestLog);
+        if (url === "/api/settings") return await handlePostSettings(req, res, deps, requestLog);
+      }
+
+      sendJson(res, 404, { error: "Not found" });
     } catch (err) {
       handleError(res, err, requestLog);
     }
   });
-
-  return server;
 }
 
-// ── Route Handlers ──
+// -- Route handlers --
 
 async function handleVoiceTurn(
   req: IncomingMessage,
@@ -168,14 +157,8 @@ async function handleVoiceTurn(
   log: Logger,
 ): Promise<void> {
   const config = deps.configStore.get();
-
-  // Read body
   const body = await readBody(req, config.server.maxAudioBytes);
-
-  // Validate content type
   const contentType = validateAudioContentType(req.headers["content-type"]);
-
-  // Validate size
   validateAudioSize(body.length, config.server.maxAudioBytes);
 
   const audio: AudioPayload = {
@@ -184,17 +167,10 @@ async function handleVoiceTurn(
     languageHint: req.headers["x-language-hint"] as string | undefined,
   };
 
-  log.info("Voice turn request received", {
-    audioBytes: body.length,
-    contentType,
-  });
+  log.info("Voice turn request received", { audioBytes: body.length, contentType });
 
   const result = await executeVoiceTurn(
-    {
-      turnId,
-      sessionKey: config.openclawSessionKey,
-      audio,
-    },
+    { turnId, sessionKey: config.openclawSessionKey, audio },
     {
       sttProviders: deps.sttProviders,
       activeProviderId: config.sttProvider,
@@ -206,15 +182,6 @@ async function handleVoiceTurn(
   sendJson(res, 200, result.reply);
 }
 
-/** Maximum body size for text turn requests (64KB). */
-const MAX_TEXT_BODY_BYTES = 64 * 1024;
-
-/**
- * POST /api/text/turn — execute a text turn (skips STT).
- *
- * Accepts JSON body: { "text": "user message" }
- * Returns GatewayReply (same envelope as voice turns, with sttMs = 0).
- */
 async function handleTextTurn(
   req: IncomingMessage,
   res: ServerResponse,
@@ -227,32 +194,15 @@ async function handleTextTurn(
   // Validate content type
   const ct = req.headers["content-type"];
   if (!ct || !ct.startsWith("application/json")) {
-    throw new UserError(
-      ErrorCodes.INVALID_CONTENT_TYPE,
-      "Content-Type must be application/json",
-    );
+    throw new UserError(ErrorCodes.INVALID_CONTENT_TYPE, "Content-Type must be application/json");
   }
 
-  // Read body (64KB max for text)
   const body = await readBody(req, MAX_TEXT_BODY_BYTES);
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(body.toString("utf-8"));
-  } catch {
-    throw new UserError(ErrorCodes.INVALID_CONFIG, "Request body is not valid JSON");
-  }
+  const parsed = parseJson(body);
 
   // Validate payload shape
-  if (
-    typeof parsed !== "object" ||
-    parsed === null ||
-    typeof (parsed as Record<string, unknown>)["text"] !== "string"
-  ) {
-    throw new UserError(
-      ErrorCodes.INVALID_CONFIG,
-      'Request body must contain a "text" field (string)',
-    );
+  if (typeof parsed !== "object" || parsed === null || typeof (parsed as Record<string, unknown>)["text"] !== "string") {
+    throw new UserError(ErrorCodes.INVALID_CONFIG, 'Request body must contain a "text" field (string)');
   }
 
   const text = ((parsed as Record<string, unknown>)["text"] as string).trim();
@@ -260,103 +210,54 @@ async function handleTextTurn(
     throw new UserError(ErrorCodes.INVALID_CONFIG, "Text must not be empty");
   }
 
-  log.info("Text turn request received", {
-    textLength: text.length,
-  });
+  log.info("Text turn request received", { textLength: text.length });
 
   const result = await executeTextTurn(
-    {
-      turnId,
-      sessionKey: config.openclawSessionKey,
-      text,
-    },
-    {
-      openclawClient: deps.openclawClient,
-      logger: deps.logger,
-    },
+    { turnId, sessionKey: config.openclawSessionKey, text },
+    { openclawClient: deps.openclawClient, logger: deps.logger },
   );
 
   sendJson(res, 200, result.reply);
 }
 
-/**
- * POST /api/settings — validate and apply runtime config patch.
- * SAFE-06: 64KB body size limit (settings are small JSON).
- * CONF-05: Returns safe config with secrets masked.
- */
 async function handlePostSettings(
   req: IncomingMessage,
   res: ServerResponse,
   deps: ServerDeps,
   log: Logger,
 ): Promise<void> {
-  // SAFE-06: Body size limit for settings (64KB max — settings are small JSON)
-  const body = await readBody(req, 64 * 1024);
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(body.toString("utf-8"));
-  } catch {
-    throw new UserError(ErrorCodes.INVALID_CONFIG, "Request body is not valid JSON");
-  }
-
+  const body = await readBody(req, MAX_TEXT_BODY_BYTES);
+  const parsed = parseJson(body);
   const patch = validateSettingsPatch(parsed);
   deps.configStore.update(patch);
 
   log.info("Settings updated successfully");
-
-  // CONF-05: Return safe config, never raw
   sendJson(res, 200, deps.configStore.getSafe());
-}
-
-/**
- * GET /api/settings — return safe config with secrets masked.
- * Uses ConfigStore.getSafe() directly (no duplicated masking logic).
- */
-function handleGetSettings(
-  res: ServerResponse,
-  configStore: ConfigStore,
-): void {
-  sendJson(res, 200, configStore.getSafe());
 }
 
 function handleHealthz(res: ServerResponse): void {
   sendJson(res, 200, { status: "ok", timestamp: new Date().toISOString() });
 }
 
-async function handleReadyz(
-  res: ServerResponse,
-  deps: ServerDeps,
-): Promise<void> {
+async function handleReadyz(res: ServerResponse, deps: ServerDeps): Promise<void> {
   const provider = deps.sttProviders.get(deps.configStore.get().sttProvider);
   const [sttHealth, clawHealth] = await Promise.all([
-    provider?.healthCheck() ??
-      Promise.resolve({ healthy: false, message: "No provider", latencyMs: 0 }),
+    provider?.healthCheck() ?? Promise.resolve({ healthy: false, message: "No provider", latencyMs: 0 }),
     deps.openclawClient.healthCheck(),
   ]);
 
   const ready = sttHealth.healthy && clawHealth.healthy;
   sendJson(res, ready ? 200 : 503, {
     status: ready ? "ready" : "not_ready",
-    checks: {
-      stt: sttHealth,
-      openclaw: clawHealth,
-    },
+    checks: { stt: sttHealth, openclaw: clawHealth },
     timestamp: new Date().toISOString(),
   });
 }
 
-// ── Helpers ──
+// -- CORS handling --
 
 /**
- * CORS handler with strict origin rejection (SAFE-07).
- *
- * - If corsOrigins is non-empty and the request Origin is NOT in the allowlist:
- *   return 403 CORS_REJECTED (blocks the request entirely).
- * - If corsOrigins is empty: allow all origins (development mode).
- * - If origin matches allowlist: add CORS headers.
- * - Preflight (OPTIONS): 204 with CORS headers if allowed, 204 without if not
- *   (browser will block the actual request).
+ * Strict CORS handler.
  *
  * Returns true if the response has been fully handled (caller should return).
  */
@@ -367,112 +268,73 @@ function handleCors(
   allowNullOrigin: boolean,
 ): boolean {
   const origin = req.headers["origin"];
+  const corsHeaders = {
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Language-Hint, X-Session-Key",
+    "Access-Control-Max-Age": "86400",
+  };
 
-  // WebView/file:// origins send the literal string "null" per RFC 6454.
-  // When allowNullOrigin is true, treat this as a permitted origin.
+  // WebView/file:// origins send literal "null" per RFC 6454
   if (origin === "null" && allowNullOrigin) {
     res.setHeader("Access-Control-Allow-Origin", "null");
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Language-Hint, X-Session-Key",
-    );
-    res.setHeader("Access-Control-Max-Age", "86400");
-    if (req.method === "OPTIONS") {
-      res.writeHead(204);
-      res.end();
-      return true;
-    }
+    for (const [k, v] of Object.entries(corsHeaders)) res.setHeader(k, v);
+    if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return true; }
     return false;
   }
 
   if (allowedOrigins.length > 0) {
-    // Strict mode: only allowlisted origins pass
     if (origin && allowedOrigins.includes(origin)) {
-      // Origin is in the allowlist — add CORS headers
+      // Allowed origin -- set CORS headers
       res.setHeader("Access-Control-Allow-Origin", origin);
-      res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-      res.setHeader(
-        "Access-Control-Allow-Headers",
-        "Content-Type, Authorization, X-Language-Hint, X-Session-Key",
-      );
-      res.setHeader("Access-Control-Max-Age", "86400");
+      for (const [k, v] of Object.entries(corsHeaders)) res.setHeader(k, v);
     } else if (origin) {
-      // Origin present but NOT in allowlist — reject
-      if (req.method === "OPTIONS") {
-        // Preflight for non-matching origin: 204 without CORS headers (browser blocks)
-        res.writeHead(204);
-        res.end();
-        return true;
-      }
-      sendJson(res, 403, {
-        error: "Origin not allowed",
-        code: ErrorCodes.CORS_REJECTED,
-      });
+      // Origin present but not in allowlist -- reject
+      if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return true; }
+      sendJson(res, 403, { error: "Origin not allowed", code: ErrorCodes.CORS_REJECTED });
       return true;
     }
-    // No origin header (e.g., server-to-server) — allow through without CORS headers
+    // No origin header (server-to-server) -- pass through without CORS headers
   } else if (origin) {
     // Development mode: allow all origins
     res.setHeader("Access-Control-Allow-Origin", origin);
-    res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-    res.setHeader(
-      "Access-Control-Allow-Headers",
-      "Content-Type, Authorization, X-Language-Hint, X-Session-Key",
-    );
-    res.setHeader("Access-Control-Max-Age", "86400");
+    for (const [k, v] of Object.entries(corsHeaders)) res.setHeader(k, v);
   }
 
-  if (req.method === "OPTIONS") {
-    res.writeHead(204);
-    res.end();
-    return true;
-  }
-
+  if (req.method === "OPTIONS") { res.writeHead(204); res.end(); return true; }
   return false;
 }
 
-function handleError(
-  res: ServerResponse,
-  err: unknown,
-  log: Logger,
-): void {
+// -- Error handling --
+
+function handleError(res: ServerResponse, err: unknown, log: Logger): void {
   if (err instanceof UserError) {
     log.warn("User error", { code: err.code, message: err.message });
-    sendJson(res, 400, {
-      error: err.message,
-      code: err.code,
-    });
+    sendJson(res, 400, { error: err.message, code: err.code });
   } else if (err instanceof OperatorError) {
     log.error("Operator error", err.toJSON());
-    sendJson(res, 502, {
-      error: "An internal error occurred. Please try again.",
-      code: err.code,
-    });
+    sendJson(res, 502, { error: "An internal error occurred. Please try again.", code: err.code });
   } else {
-    log.error("Unexpected error", {
-      error: err instanceof Error ? err.message : String(err),
-    });
-    sendJson(res, 500, {
-      error: "An unexpected error occurred.",
-      code: ErrorCodes.INTERNAL_ERROR,
-    });
+    log.error("Unexpected error", { error: err instanceof Error ? err.message : String(err) });
+    sendJson(res, 500, { error: "An unexpected error occurred.", code: ErrorCodes.INTERNAL_ERROR });
   }
 }
 
-function sendJson(
-  res: ServerResponse,
-  statusCode: number,
-  body: unknown,
-): void {
+// -- Utilities --
+
+function sendJson(res: ServerResponse, statusCode: number, body: unknown): void {
   res.writeHead(statusCode, { "Content-Type": "application/json" });
   res.end(JSON.stringify(body));
 }
 
-function readBody(
-  req: IncomingMessage,
-  maxBytes: number,
-): Promise<Buffer> {
+function parseJson(body: Buffer): unknown {
+  try {
+    return JSON.parse(body.toString("utf-8"));
+  } catch {
+    throw new UserError(ErrorCodes.INVALID_CONFIG, "Request body is not valid JSON");
+  }
+}
+
+function readBody(req: IncomingMessage, maxBytes: number): Promise<Buffer> {
   return new Promise((resolve, reject) => {
     const chunks: Buffer[] = [];
     let totalBytes = 0;
@@ -494,19 +356,11 @@ function readBody(
       chunks.push(chunk);
     });
 
-    req.on("end", () => {
-      if (!rejected) resolve(Buffer.concat(chunks));
-    });
+    req.on("end", () => { if (!rejected) resolve(Buffer.concat(chunks)); });
 
     req.on("error", (err) => {
       if (rejected) return;
-      reject(
-        new OperatorError(
-          ErrorCodes.INTERNAL_ERROR,
-          "Failed to read request body",
-          err.message,
-        ),
-      );
+      reject(new OperatorError(ErrorCodes.INTERNAL_ERROR, "Failed to read request body", err.message));
     });
   });
 }

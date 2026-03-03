@@ -1,9 +1,8 @@
 /**
- * Gateway API — main entry point.
+ * Gateway API entry point.
  *
- * Wires up all dependencies and starts the HTTP server.
- * Creates ConfigStore from initial config, runs startup pre-checks,
- * then opens the readiness gate after server is listening.
+ * Wires all dependencies, runs startup pre-checks, opens the HTTP
+ * server, and handles graceful shutdown on SIGTERM/SIGINT.
  */
 
 import { rootLogger } from "@voice-gateway/logging";
@@ -22,6 +21,7 @@ import { registerOpenClawRebuilder } from "./openclaw-rebuilder.js";
 
 const log = rootLogger.child({ component: "startup" });
 
+/** Build the initial set of STT providers from config. */
 function buildSttProviders(cfg: GatewayConfig): Map<string, SttProvider> {
   const providers = new Map<string, SttProvider>();
   providers.set(ProviderIds.WhisperX, new WhisperXProvider(cfg.whisperx, rootLogger));
@@ -35,19 +35,14 @@ async function main(): Promise<void> {
   const config = loadConfig();
   const configStore = new ConfigStore(config);
 
-  // Initialize STT providers
+  // Initialize STT providers and OpenClaw client
   const sttProviders = buildSttProviders(config);
-
-  // Initialize OpenClaw client
   const openclawClient = new OpenClawClient(
-    {
-      gatewayUrl: config.openclawGatewayUrl,
-      authToken: config.openclawGatewayToken,
-    },
+    { gatewayUrl: config.openclawGatewayUrl, authToken: config.openclawGatewayToken },
     rootLogger,
   );
 
-  // Create server with readiness gate closed
+  // Assemble server deps with readiness gate closed
   const deps: ServerDeps = {
     configStore,
     sttProviders,
@@ -56,14 +51,13 @@ async function main(): Promise<void> {
     ready: false,
   };
 
-  // PIPE-07: Re-initialize providers when their config section changes
+  // Register hot-reload listeners
   registerProviderRebuilder(configStore, sttProviders, rootLogger);
-  // Re-initialize OpenClaw client when connection config changes
   registerOpenClawRebuilder(configStore, deps, rootLogger);
 
   const server = createGatewayServer(deps);
 
-  // OPS-03: Startup pre-checks with bounded timeout
+  // Startup pre-checks with bounded 30s timeout
   const startupTimeout = setTimeout(() => {
     log.error("Startup timed out after 30s");
     process.exit(1);
@@ -85,18 +79,18 @@ async function main(): Promise<void> {
   }
   log.info("Startup pre-checks passed", { stt: sttHealth, openclaw: clawHealth });
 
-  // Start listening — readiness gate opens after port is bound
-  const serverConfig = configStore.get().server;
-  server.listen(serverConfig.port, serverConfig.host, () => {
+  // Start listening -- readiness gate opens after port is bound
+  const serverCfg = configStore.get().server;
+  server.listen(serverCfg.port, serverCfg.host, () => {
     deps.ready = true;
     log.info("Gateway API started", {
-      port: serverConfig.port,
-      host: serverConfig.host,
+      port: serverCfg.port,
+      host: serverCfg.host,
       sttProvider: configStore.get().sttProvider,
     });
   });
 
-  // Graceful shutdown with bounded timeout
+  // Graceful shutdown
   const shutdown = (): void => {
     log.info("Shutting down");
     deps.ready = false;
@@ -105,7 +99,7 @@ async function main(): Promise<void> {
       log.info("Server closed");
       process.exit(0);
     });
-    // Force exit after 10 seconds if connections hang
+    // Force exit after 10s if connections hang
     setTimeout(() => {
       log.warn("Forced shutdown after timeout");
       process.exit(1);
@@ -117,8 +111,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((err) => {
-  log.error("Fatal startup error", {
-    error: err instanceof Error ? err.message : String(err),
-  });
+  log.error("Fatal startup error", { error: err instanceof Error ? err.message : String(err) });
   process.exit(1);
 });

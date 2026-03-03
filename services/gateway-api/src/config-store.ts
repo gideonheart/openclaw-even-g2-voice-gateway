@@ -1,13 +1,10 @@
 /**
- * ConfigStore — mutable config wrapper with immutable snapshots.
+ * Mutable configuration store with immutable read snapshots.
  *
- * Single source of truth for runtime configuration. All readers
- * (server handlers, orchestrator, readyz) read from ConfigStore.
- * The validation function ensures all external input is validated
- * before reaching business logic.
- *
- * CONF-03: Runtime settings mutations via ConfigStore.update()
- * CONF-04: Validated settings patch for POST /api/settings
+ * Single source of truth for runtime configuration. Consumers read
+ * via get() (full config) or getSafe() (secrets masked). Mutations
+ * arrive via update() which shallow-merges nested objects and fires
+ * registered change listeners.
  */
 
 import type {
@@ -30,9 +27,11 @@ import {
   validatePositiveInt,
 } from "@voice-gateway/validation";
 
+// -- Public types --
+
 /**
  * A validated partial update for GatewayConfig.
- * All fields are optional at both top and nested levels.
+ * All fields optional at both top and nested levels.
  */
 export interface ValidatedSettingsPatch {
   readonly openclawGatewayUrl?: string;
@@ -45,20 +44,21 @@ export interface ValidatedSettingsPatch {
   readonly server?: Partial<ServerConfig>;
 }
 
-/** Callback fired after ConfigStore.update() with the patch and fully merged config. */
+/** Callback fired after ConfigStore.update(). */
 export type ConfigChangeListener = (
   patch: ValidatedSettingsPatch,
   config: Readonly<GatewayConfig>,
 ) => void;
 
+// -- ConfigStore --
+
 /**
- * Mutable configuration store with immutable read snapshots.
+ * Mutable configuration store.
  *
- * Wraps GatewayConfig and provides:
- * - `get()` — full config for internal consumers
- * - `getSafe()` — masked config for API responses (secrets hidden)
- * - `update()` — applies a validated partial patch
- * - `onChange()` — registers a listener for config changes
+ * - get()     returns full config for internal consumers
+ * - getSafe() returns masked config safe for API responses
+ * - update()  applies a validated partial patch, fires listeners
+ * - onChange() registers a change listener
  */
 export class ConfigStore {
   private config: GatewayConfig;
@@ -68,215 +68,151 @@ export class ConfigStore {
     this.config = { ...initial };
   }
 
-  /** Registers a listener that is called after every update() with the patch and new config. */
+  /** Register a listener called after every update(). */
   onChange(listener: ConfigChangeListener): void {
     this.listeners.push(listener);
   }
 
-  /** Returns the current full config (readonly view). */
+  /** Return the current full config (readonly view). */
   get(): Readonly<GatewayConfig> {
     return this.config;
   }
 
-  /** Returns config with all secrets masked — safe for API responses. */
+  /** Return config with secrets masked -- safe for API responses. */
   getSafe(): SafeGatewayConfig {
+    const c = this.config;
     return {
-      openclawGatewayUrl: this.config.openclawGatewayUrl,
+      openclawGatewayUrl: c.openclawGatewayUrl,
       openclawGatewayToken: "********",
-      openclawSessionKey: this.config.openclawSessionKey,
-      sttProvider: this.config.sttProvider,
-      whisperx: {
-        baseUrl: this.config.whisperx.baseUrl,
-        model: this.config.whisperx.model,
-      },
-      openai: {
-        apiKey: "********",
-        model: this.config.openai.model,
-      },
-      customHttp: {
-        url: this.config.customHttp.url,
-        authHeader: "********",
-      },
-      server: this.config.server,
+      openclawSessionKey: c.openclawSessionKey,
+      sttProvider: c.sttProvider,
+      whisperx: { baseUrl: c.whisperx.baseUrl, model: c.whisperx.model },
+      openai: { apiKey: "********", model: c.openai.model },
+      customHttp: { url: c.customHttp.url, authHeader: "********" },
+      server: c.server,
     };
   }
 
   /**
-   * Applies a validated partial update to the config.
+   * Apply a validated partial update.
    *
-   * Top-level scalar fields are overwritten.
-   * Nested objects (whisperx, openai, customHttp, server) are shallow-merged
-   * so partial nested updates don't destroy sibling fields.
+   * Top-level scalars are overwritten. Nested objects are shallow-merged
+   * so partial nested updates preserve sibling fields.
    */
   update(patch: ValidatedSettingsPatch): void {
+    const prev = this.config;
+
     this.config = {
-      ...this.config,
-      ...(patch.openclawGatewayUrl !== undefined && {
-        openclawGatewayUrl: patch.openclawGatewayUrl,
-      }),
-      ...(patch.openclawGatewayToken !== undefined && {
-        openclawGatewayToken: patch.openclawGatewayToken,
-      }),
-      ...(patch.openclawSessionKey !== undefined && {
-        openclawSessionKey: patch.openclawSessionKey,
-      }),
-      ...(patch.sttProvider !== undefined && {
-        sttProvider: patch.sttProvider,
-      }),
-      ...(patch.whisperx !== undefined && {
-        whisperx: { ...this.config.whisperx, ...patch.whisperx },
-      }),
-      ...(patch.openai !== undefined && {
-        openai: { ...this.config.openai, ...patch.openai },
-      }),
-      ...(patch.customHttp !== undefined && {
-        customHttp: { ...this.config.customHttp, ...patch.customHttp },
-      }),
-      ...(patch.server !== undefined && {
-        server: { ...this.config.server, ...patch.server },
-      }),
+      ...prev,
+      ...(patch.openclawGatewayUrl !== undefined && { openclawGatewayUrl: patch.openclawGatewayUrl }),
+      ...(patch.openclawGatewayToken !== undefined && { openclawGatewayToken: patch.openclawGatewayToken }),
+      ...(patch.openclawSessionKey !== undefined && { openclawSessionKey: patch.openclawSessionKey }),
+      ...(patch.sttProvider !== undefined && { sttProvider: patch.sttProvider }),
+      ...(patch.whisperx !== undefined && { whisperx: { ...prev.whisperx, ...patch.whisperx } }),
+      ...(patch.openai !== undefined && { openai: { ...prev.openai, ...patch.openai } }),
+      ...(patch.customHttp !== undefined && { customHttp: { ...prev.customHttp, ...patch.customHttp } }),
+      ...(patch.server !== undefined && { server: { ...prev.server, ...patch.server } }),
     };
 
     for (const fn of this.listeners) fn(patch, this.config);
   }
 }
 
-// ── Validation ──
+// -- Validation --
 
 /**
- * Validates a raw settings patch from an external source (e.g., POST /api/settings).
+ * Validate a raw settings patch from an external source.
  *
- * Only present fields are validated. Unknown top-level fields are silently ignored.
- * Catches TypeError from branded constructors and rethrows as UserError
- * so the HTTP layer returns 400, not 500.
- *
- * @param body - Raw input from request body (unknown type)
- * @returns A validated partial settings patch safe for ConfigStore.update()
- * @throws UserError with INVALID_CONFIG code for any validation failure
+ * Only present fields are validated. Unknown top-level fields are silently
+ * ignored. Branded-type constructor TypeErrors are re-thrown as UserError
+ * so the HTTP layer returns 400.
  */
 export function validateSettingsPatch(body: unknown): ValidatedSettingsPatch {
   if (body == null || typeof body !== "object" || Array.isArray(body)) {
-    throw new UserError(
-      ErrorCodes.INVALID_CONFIG,
-      "Settings patch must be a non-null object.",
-    );
+    throw new UserError(ErrorCodes.INVALID_CONFIG, "Settings patch must be a non-null object.");
   }
 
   const raw = body as Record<string, unknown>;
   const patch: Record<string, unknown> = {};
 
-  // ── Top-level scalars ──
+  // -- Top-level scalars --
 
-  if ("openclawGatewayUrl" in raw && raw["openclawGatewayUrl"] !== undefined) {
-    patch["openclawGatewayUrl"] = validateUrl(
-      String(raw["openclawGatewayUrl"]),
-      "openclawGatewayUrl",
-    );
+  if (has(raw, "openclawGatewayUrl")) {
+    patch["openclawGatewayUrl"] = validateUrl(String(raw["openclawGatewayUrl"]), "openclawGatewayUrl");
   }
 
-  if ("openclawGatewayToken" in raw && raw["openclawGatewayToken"] !== undefined) {
-    patch["openclawGatewayToken"] = requireNonEmpty(
-      String(raw["openclawGatewayToken"]),
-      "openclawGatewayToken",
-    );
+  if (has(raw, "openclawGatewayToken")) {
+    patch["openclawGatewayToken"] = requireNonEmpty(String(raw["openclawGatewayToken"]), "openclawGatewayToken");
   }
 
-  if ("openclawSessionKey" in raw && raw["openclawSessionKey"] !== undefined) {
-    try {
-      patch["openclawSessionKey"] = createSessionKey(String(raw["openclawSessionKey"]));
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new UserError(ErrorCodes.INVALID_CONFIG, err.message);
-      }
-      throw err;
-    }
+  if (has(raw, "openclawSessionKey")) {
+    patch["openclawSessionKey"] = brandSafe(() => createSessionKey(String(raw["openclawSessionKey"])));
   }
 
-  if ("sttProvider" in raw && raw["sttProvider"] !== undefined) {
-    try {
-      patch["sttProvider"] = createProviderId(String(raw["sttProvider"]));
-    } catch (err) {
-      if (err instanceof TypeError) {
-        throw new UserError(ErrorCodes.INVALID_CONFIG, err.message);
-      }
-      throw err;
-    }
+  if (has(raw, "sttProvider")) {
+    patch["sttProvider"] = brandSafe(() => createProviderId(String(raw["sttProvider"])));
   }
 
-  // ── Nested: whisperx ──
+  // -- Nested: whisperx --
 
-  if ("whisperx" in raw && raw["whisperx"] !== undefined) {
-    if (typeof raw["whisperx"] !== "object" || raw["whisperx"] == null) {
-      throw new UserError(ErrorCodes.INVALID_CONFIG, "whisperx must be an object.");
-    }
-    const wxRaw = raw["whisperx"] as Record<string, unknown>;
-    const wx: Record<string, unknown> = {};
-
-    if ("baseUrl" in wxRaw && wxRaw["baseUrl"] !== undefined) {
-      wx["baseUrl"] = validateUrl(String(wxRaw["baseUrl"]), "whisperx.baseUrl");
-    }
-    if ("model" in wxRaw && wxRaw["model"] !== undefined) {
-      wx["model"] = requireNonEmpty(String(wxRaw["model"]), "whisperx.model");
-    }
-    if ("language" in wxRaw && wxRaw["language"] !== undefined) {
-      wx["language"] = requireNonEmpty(String(wxRaw["language"]), "whisperx.language");
-    }
-    if ("pollIntervalMs" in wxRaw && wxRaw["pollIntervalMs"] !== undefined) {
-      wx["pollIntervalMs"] = validatePositiveInt(wxRaw["pollIntervalMs"], "whisperx.pollIntervalMs");
-    }
-    if ("timeoutMs" in wxRaw && wxRaw["timeoutMs"] !== undefined) {
-      wx["timeoutMs"] = validatePositiveInt(wxRaw["timeoutMs"], "whisperx.timeoutMs");
-    }
-
-    if (Object.keys(wx).length > 0) {
-      patch["whisperx"] = wx;
-    }
+  if (has(raw, "whisperx")) {
+    const nested = requireObject(raw["whisperx"], "whisperx");
+    const fields: Record<string, unknown> = {};
+    if (has(nested, "baseUrl")) fields["baseUrl"] = validateUrl(String(nested["baseUrl"]), "whisperx.baseUrl");
+    if (has(nested, "model")) fields["model"] = requireNonEmpty(String(nested["model"]), "whisperx.model");
+    if (has(nested, "language")) fields["language"] = requireNonEmpty(String(nested["language"]), "whisperx.language");
+    if (has(nested, "pollIntervalMs")) fields["pollIntervalMs"] = validatePositiveInt(nested["pollIntervalMs"], "whisperx.pollIntervalMs");
+    if (has(nested, "timeoutMs")) fields["timeoutMs"] = validatePositiveInt(nested["timeoutMs"], "whisperx.timeoutMs");
+    if (Object.keys(fields).length > 0) patch["whisperx"] = fields;
   }
 
-  // ── Nested: openai ──
+  // -- Nested: openai --
 
-  if ("openai" in raw && raw["openai"] !== undefined) {
-    if (typeof raw["openai"] !== "object" || raw["openai"] == null) {
-      throw new UserError(ErrorCodes.INVALID_CONFIG, "openai must be an object.");
-    }
-    const oaiRaw = raw["openai"] as Record<string, unknown>;
-    const oai: Record<string, unknown> = {};
-
-    if ("apiKey" in oaiRaw && oaiRaw["apiKey"] !== undefined) {
-      oai["apiKey"] = requireNonEmpty(String(oaiRaw["apiKey"]), "openai.apiKey");
-    }
-    if ("model" in oaiRaw && oaiRaw["model"] !== undefined) {
-      oai["model"] = requireNonEmpty(String(oaiRaw["model"]), "openai.model");
-    }
-    if ("language" in oaiRaw && oaiRaw["language"] !== undefined) {
-      oai["language"] = requireNonEmpty(String(oaiRaw["language"]), "openai.language");
-    }
-
-    if (Object.keys(oai).length > 0) {
-      patch["openai"] = oai;
-    }
+  if (has(raw, "openai")) {
+    const nested = requireObject(raw["openai"], "openai");
+    const fields: Record<string, unknown> = {};
+    if (has(nested, "apiKey")) fields["apiKey"] = requireNonEmpty(String(nested["apiKey"]), "openai.apiKey");
+    if (has(nested, "model")) fields["model"] = requireNonEmpty(String(nested["model"]), "openai.model");
+    if (has(nested, "language")) fields["language"] = requireNonEmpty(String(nested["language"]), "openai.language");
+    if (Object.keys(fields).length > 0) patch["openai"] = fields;
   }
 
-  // ── Nested: customHttp ──
+  // -- Nested: customHttp --
 
-  if ("customHttp" in raw && raw["customHttp"] !== undefined) {
-    if (typeof raw["customHttp"] !== "object" || raw["customHttp"] == null) {
-      throw new UserError(ErrorCodes.INVALID_CONFIG, "customHttp must be an object.");
-    }
-    const chRaw = raw["customHttp"] as Record<string, unknown>;
-    const ch: Record<string, unknown> = {};
-
-    if ("url" in chRaw && chRaw["url"] !== undefined) {
-      ch["url"] = validateUrl(String(chRaw["url"]), "customHttp.url");
-    }
-    if ("authHeader" in chRaw && chRaw["authHeader"] !== undefined) {
-      ch["authHeader"] = requireNonEmpty(String(chRaw["authHeader"]), "customHttp.authHeader");
-    }
-
-    if (Object.keys(ch).length > 0) {
-      patch["customHttp"] = ch;
-    }
+  if (has(raw, "customHttp")) {
+    const nested = requireObject(raw["customHttp"], "customHttp");
+    const fields: Record<string, unknown> = {};
+    if (has(nested, "url")) fields["url"] = validateUrl(String(nested["url"]), "customHttp.url");
+    if (has(nested, "authHeader")) fields["authHeader"] = requireNonEmpty(String(nested["authHeader"]), "customHttp.authHeader");
+    if (Object.keys(fields).length > 0) patch["customHttp"] = fields;
   }
 
   return patch as ValidatedSettingsPatch;
+}
+
+// -- Internal helpers --
+
+/** Check whether a key is present and its value is not undefined. */
+function has(obj: Record<string, unknown>, key: string): boolean {
+  return key in obj && obj[key] !== undefined;
+}
+
+/** Assert that a value is a non-null object, or throw UserError. */
+function requireObject(value: unknown, label: string): Record<string, unknown> {
+  if (typeof value !== "object" || value == null) {
+    throw new UserError(ErrorCodes.INVALID_CONFIG, `${label} must be an object.`);
+  }
+  return value as Record<string, unknown>;
+}
+
+/** Call a branded-type constructor, catching TypeError and re-throwing as UserError. */
+function brandSafe<T>(fn: () => T): T {
+  try {
+    return fn();
+  } catch (err) {
+    if (err instanceof TypeError) {
+      throw new UserError(ErrorCodes.INVALID_CONFIG, err.message);
+    }
+    throw err;
+  }
 }
