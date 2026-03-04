@@ -36,7 +36,7 @@ export function createSessionKey(key: string): SessionKey {
 
 /** Brand a validated provider ID string. */
 export function createProviderId(id: string): ProviderId {
-  const valid = ["whisperx", "openai", "custom"] as const;
+  const valid = ["whisperx", "openai", "custom", "text"] as const;
   if (!(valid as readonly string[]).includes(id)) {
     throw new TypeError(
       `Invalid ProviderId: "${id}". Must be one of: ${valid.join(", ")}`,
@@ -50,4 +50,6 @@ export const ProviderIds = {
   WhisperX: "whisperx" as ProviderId,
   OpenAI: "openai" as ProviderId,
   Custom: "custom" as ProviderId,
+  /** Used for text turns (no STT provider). */
+  Text: "text" as ProviderId,
 } as const;

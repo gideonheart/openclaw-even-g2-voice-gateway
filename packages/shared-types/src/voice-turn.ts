@@ -1,7 +1,8 @@
 /**
- * Core domain types for the voice turn pipeline.
+ * Core domain types for the voice and text turn pipelines.
  *
- * Audio in → STT → OpenClaw → Shaped Response out.
+ * Voice: Audio in → STT → OpenClaw → Shaped Response out.
+ * Text:  Text in → OpenClaw → Shaped Response out.
  */
 
 import type { TurnId, SessionKey, ProviderId } from "./branded.js";
@@ -101,6 +102,8 @@ export interface GatewayReply {
   readonly turnId: TurnId;
   /** Session this turn belongs to. */
   readonly sessionKey: SessionKey;
+  /** User's transcribed speech (voice turns only; absent for text turns). */
+  readonly transcript?: string;
   /** Shaped assistant response. */
   readonly assistant: {
     /** Full untruncated text. */
@@ -134,4 +137,22 @@ export interface VoiceTurnResult {
   readonly reply: GatewayReply;
   /** The raw STT result (for debugging). */
   readonly sttResult: SttResult;
+}
+
+// ── Text Turn Request/Result ──
+
+/** Input to the text turn pipeline (skips STT). */
+export interface TextTurnRequest {
+  /** Correlation ID for tracing. */
+  readonly turnId: TurnId;
+  /** Target OpenClaw session. */
+  readonly sessionKey: SessionKey;
+  /** User-typed text message. */
+  readonly text: string;
+}
+
+/** Result of a completed text turn. */
+export interface TextTurnResult {
+  /** The full gateway reply. */
+  readonly reply: GatewayReply;
 }

@@ -33,6 +33,8 @@ export type {
   GatewayReply,
   VoiceTurnRequest,
   VoiceTurnResult,
+  TextTurnRequest,
+  TextTurnResult,
 } from "./voice-turn.js";
 
 export type {

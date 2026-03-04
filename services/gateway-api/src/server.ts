@@ -11,6 +11,7 @@
  */
 
 import { createServer, type Server, type IncomingMessage, type ServerResponse } from "node:http";
+import { writeFile, mkdir } from "node:fs/promises";
 import type {
   GatewayConfig,
   ProviderId,
@@ -168,6 +169,18 @@ async function handleVoiceTurn(
   };
 
   log.info("Voice turn request received", { audioBytes: body.length, contentType });
+
+  // DEBUG: save audio to disk so we can listen to what the client sends
+  const ext = contentType === "audio/webm" ? "webm" : "wav";
+  const debugDir = "/home/forge/openclaw-even-g2-voice-gateway/audio-debug";
+  const debugPath = `${debugDir}/${turnId}-${Date.now()}.${ext}`;
+  try {
+    await mkdir(debugDir, { recursive: true });
+    await writeFile(debugPath, body);
+    log.info("DEBUG audio saved", { path: debugPath, bytes: body.length });
+  } catch (e) {
+    log.warn("DEBUG audio save failed", { error: String(e) });
+  }
 
   const result = await executeVoiceTurn(
     { turnId, sessionKey: config.openclawSessionKey, audio },

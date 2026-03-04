@@ -228,6 +228,7 @@ describe("Voice Turn Integration", () => {
     // Verify response structure
     expect(reply.turnId).toBeDefined();
     expect(reply.sessionKey).toBe("test-session");
+    expect(reply.transcript).toBe("What is the weather today");
     expect(reply.assistant.fullText).toBe(
       "AI response to: What is the weather today",
     );

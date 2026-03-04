@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { executeVoiceTurn } from "./orchestrator.js";
+import { executeVoiceTurn, executeTextTurn } from "./orchestrator.js";
 import { Logger } from "@voice-gateway/logging";
 import {
   createTurnId,
@@ -122,5 +122,85 @@ describe("executeVoiceTurn", () => {
         },
       ),
     ).rejects.toThrow(/STT provider not available/);
+  });
+});
+
+describe("executeTextTurn", () => {
+  beforeEach(() => {
+    vi.spyOn(process.stdout, "write").mockReturnValue(true);
+    vi.spyOn(process.stderr, "write").mockReturnValue(true);
+  });
+
+  it("orchestrates text pipeline: OpenClaw → Shape (no STT)", async () => {
+    const turnId = createTurnId("turn_text_1");
+    const sessionKey = createSessionKey("text-session");
+
+    const mockClawResponse: OpenClawInbound = {
+      sessionKey,
+      turnId,
+      text: "Sure, I can help with that.",
+      timestamp: new Date().toISOString(),
+    };
+
+    const mockClient = {
+      sendTranscript: vi.fn().mockResolvedValue(mockClawResponse),
+    };
+
+    const result = await executeTextTurn(
+      { turnId, sessionKey, text: "Can you help me?" },
+      {
+        openclawClient: mockClient as any,
+        logger: new Logger(),
+      },
+    );
+
+    // Verify OpenClaw was called with the user text
+    expect(mockClient.sendTranscript).toHaveBeenCalledWith(
+      sessionKey,
+      turnId,
+      "Can you help me?",
+    );
+
+    // Verify reply structure
+    expect(result.reply.turnId).toBe(turnId);
+    expect(result.reply.sessionKey).toBe(sessionKey);
+    expect(result.reply.assistant.fullText).toBe("Sure, I can help with that.");
+    expect(result.reply.assistant.segments.length).toBeGreaterThan(0);
+
+    // Text turns have sttMs = 0
+    expect(result.reply.timing.sttMs).toBe(0);
+    expect(result.reply.timing.agentMs).toBeGreaterThanOrEqual(0);
+    expect(result.reply.timing.totalMs).toBeGreaterThanOrEqual(0);
+
+    // Provider should be "text" for text turns
+    expect(result.reply.meta.provider).toBe("text");
+    expect(result.reply.meta.model).toBeNull();
+  });
+
+  it("does not require STT providers", async () => {
+    const turnId = createTurnId("turn_text_no_stt");
+    const sessionKey = createSessionKey("no-stt-session");
+
+    const mockClawResponse: OpenClawInbound = {
+      sessionKey,
+      turnId,
+      text: "Response without STT.",
+      timestamp: new Date().toISOString(),
+    };
+
+    const mockClient = {
+      sendTranscript: vi.fn().mockResolvedValue(mockClawResponse),
+    };
+
+    // No sttProviders needed -- this should not throw
+    const result = await executeTextTurn(
+      { turnId, sessionKey, text: "Direct text" },
+      {
+        openclawClient: mockClient as any,
+        logger: new Logger(),
+      },
+    );
+
+    expect(result.reply.assistant.fullText).toBe("Response without STT.");
   });
 });
